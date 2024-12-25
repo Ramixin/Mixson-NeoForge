@@ -6,6 +6,8 @@ public interface MixsonEventTypes {
 
     interface Creation extends BaseEvent { }
 
+    interface Deletion extends BaseEvent { }
+
     interface Modification extends BaseEvent { }
 
 

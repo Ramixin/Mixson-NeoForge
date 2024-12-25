@@ -47,6 +47,14 @@ public class Mixson {
         register(pair.getValue(), associatedResourceId, resourceId, event, silentlyFail, pair.getKey());
     }
 
+    public static void registerDeletionEvent(int priority, ResourceLocation resourceId, ResourceLocation eventId, final DeletionEvent event, boolean silentlyFail) {
+        register(priority, resourceId, eventId, event, silentlyFail);
+    }
+
+    public static void registerDeletionEvent(int priority, ResourceLocation resourceId, ResourceLocation eventId, final AdvancedDeletionEvent event, boolean silentlyFail, final ResourceReference... references) {
+        register(priority, resourceId, eventId, event, silentlyFail);
+    }
+
     private static void register(int priority, ResourceLocation resourceId, ResourceLocation eventId, MixsonEventTypes.BaseEvent event, boolean silentlyFail, final UUID... referenceIds) {
         List<AssociatedMixsonEvent> eventSet;
         if(events.get(priority) == null) eventSet = new ArrayList<>();
@@ -61,15 +69,21 @@ public class Mixson {
         JsonElement[] modifiedEntries = new JsonElement[original.size()];
         for (List<AssociatedMixsonEvent> eventSet : events.values()) for (AssociatedMixsonEvent event : eventSet) {
             if(!event.resourceId().equals(id)) continue;
-            if (event.event() instanceof CreationEvent) original.add(buildResource(original.getFirst(), runCreationEvent(event)));
-            else for (int i = 0; i < original.size(); i++) {
-                try {
-                    if(modifiedEntries[i] == null) modifiedEntries[i] = JsonParser.parseReader(original.get(i).openAsReader());
-                    JsonElement elem = modifiedEntries[i].getAsJsonObject();
-                    modifiedEntries[i] = runModificationEvent(event, elem);
-                } catch (Exception e) {
-                    error(e, event);
+            switch (event.event()) {
+                case MixsonEventTypes.Creation unused -> original.add(buildResource(original.getFirst(), runCreationEvent(event)));
+                case MixsonEventTypes.Deletion unused -> { if (runDeletionEvent(event)) return List.of(); }
+                case MixsonEventTypes.Modification unused -> {
+                    for (int i = 0; i < original.size(); i++) {
+                        try {
+                            if(modifiedEntries[i] == null) modifiedEntries[i] = JsonParser.parseReader(original.get(i).openAsReader());
+                            JsonElement elem = modifiedEntries[i].getAsJsonObject();
+                            modifiedEntries[i] = runModificationEvent(event, elem);
+                        } catch (Exception e) {
+                            error(e, event);
+                        }
+                    }
                 }
+                default -> throw new IllegalStateException("Unexpected value: " + event.event());
             }
         }
         for (int i = 0; i < original.size(); i++) if(modifiedEntries[i] != null) {
@@ -83,13 +97,18 @@ public class Mixson {
         HashMap<ResourceLocation, JsonElement> modifiedEntries = new HashMap<>();
         for (List<AssociatedMixsonEvent> eventSet : Mixson.events.sequencedValues()) for (AssociatedMixsonEvent event : eventSet) {
             if (!original.containsKey(event.resourceId())) continue;
-            if (event.event() instanceof MixsonEventTypes.Creation)
-                original.put(event.eventId(), buildResource(original.get(event.resourceId()), runCreationEvent(event)));
-            else try {
-                JsonElement elem = modifiedEntries.getOrDefault(event.resourceId(), JsonParser.parseReader(original.get(event.resourceId()).openAsReader()));
-                modifiedEntries.put(event.resourceId(), runModificationEvent(event, elem));
-            } catch (Exception e) {
-                error(e, event);
+            switch (event.event()) {
+                case MixsonEventTypes.Creation unused -> original.put(event.eventId(), buildResource(original.get(event.resourceId()), runCreationEvent(event)));
+                case MixsonEventTypes.Deletion unused -> { if (runDeletionEvent(event)) original.remove(event.resourceId()); }
+                case MixsonEventTypes.Modification unused -> {
+                    try {
+                        JsonElement elem = modifiedEntries.getOrDefault(event.resourceId(), JsonParser.parseReader(original.get(event.resourceId()).openAsReader()));
+                        modifiedEntries.put(event.resourceId(), runModificationEvent(event, elem));
+                    } catch (Exception e) {
+                        error(e, event);
+                    }
+                }
+                default -> throw new IllegalStateException("Unexpected value: " + event.event());
             }
         }
         for (Map.Entry<ResourceLocation, JsonElement> modifiedEntry : modifiedEntries.entrySet()) {
@@ -102,27 +121,39 @@ public class Mixson {
 
     // INTERNAL RUN METHODS
 
+    private static boolean runDeletionEvent(AssociatedMixsonEvent event) {
+        if(event.referenceIds().length == 0) {
+            if(event.event() instanceof DeletionEvent simpleEvent) return simpleEvent.run();
+            else throw new MixsonError("Creation Events with no resource references must be of type DeletionEvent");
+        } else {
+            if(event.event() instanceof AdvancedDeletionEvent advancedEvent) {
+                return advancedEvent.run(buildUsableReferences(event));
+            }
+            else throw new MixsonError("Creation Events with resource references must be of type AdvancedDeletionEvent");
+        }
+    }
+
     private static JsonElement runCreationEvent(AssociatedMixsonEvent event) {
         if(event.referenceIds().length == 0) {
             if(event.event() instanceof CreationEvent simpleEvent) return simpleEvent.run();
-            else throw new MixsonError("Creation Events with no resource references must be of type ModificationMixsonEvent");
+            else throw new MixsonError("Creation Events with no resource references must be of type CreationEvent");
         } else {
             if(event.event() instanceof AdvancedCreationEvent advancedEvent) {
                 return advancedEvent.run(buildUsableReferences(event));
             }
-            else throw new MixsonError("Creation Events with resource references must be of type AdvancedMixsonEvent");
+            else throw new MixsonError("Creation Events with resource references must be of type AdvancedCreationEvent");
         }
     }
 
     private static JsonElement runModificationEvent(AssociatedMixsonEvent event, JsonElement elem) {
         if(event.referenceIds().length == 0) {
             if(event.event() instanceof ModificationEvent simpleEvent) return simpleEvent.run(elem);
-            else throw new MixsonError("Modification Events with no resource references must be of type SimpleMixsonEvent");
+            else throw new MixsonError("Modification Events with no resource references must be of type ModificationEvent");
         } else {
             if(event.event() instanceof AdvancedModificationEvent advancedEvent) {
                 return advancedEvent.run(elem, buildUsableReferences(event));
             }
-            else throw new MixsonError("Modification Events with resource references must be of type AdvancedMixsonEvent");
+            else throw new MixsonError("Modification Events with resource references must be of type AdvancedModificationEvent");
         }
     }
 
