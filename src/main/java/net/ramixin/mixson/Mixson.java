@@ -16,6 +16,7 @@ import java.util.*;
 public class Mixson {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("Mixson");
+    private static DebugMode debugMode = DebugMode.OFF;
     private static final TreeMap<Integer, List<AssociatedMixsonEvent>> events = new TreeMap<>();
     private static final HashMap<UUID, BuiltResourceReference> references = new HashMap<>();
     public static final int DEFAULT_PRIORITY = 1000;
@@ -31,27 +32,33 @@ public class Mixson {
     }
 
     public static void registerModificationEvent(int priority, ResourceLocation resourceId, ResourceLocation eventId, final ModificationEvent event, boolean silentlyFail) {
+        logAction("Registering Modification Event '{}' on resource '{}' with priority {}", eventId, resourceId, priority);
         register(priority, resourceId, eventId, event, silentlyFail);
     }
 
     public static void registerModificationEvent(int priority, ResourceLocation resourceId, ResourceLocation eventId, final AdvancedModificationEvent event, boolean silentlyFail, final ResourceReference... references) {
+        logAction("Registering Advanced Modification Event '{}' on resource '{}' with priority {}", eventId, resourceId, priority);
         register(priority, resourceId, eventId, event, silentlyFail, buildReferences(eventId, silentlyFail, references).getKey());
     }
 
     public static void registerCreationEvent(ResourceLocation associatedResourceId, ResourceLocation resourceId, final CreationEvent event, boolean silentlyFail) {
+        logAction("Registering Creation Event for resource '{}' associated with '{}' with priority {}", resourceId, associatedResourceId, DEFAULT_PRIORITY);
         register(DEFAULT_PRIORITY, associatedResourceId, resourceId, event, silentlyFail);
     }
 
     public static void registerCreationEvent(ResourceLocation associatedResourceId, ResourceLocation resourceId, final AdvancedCreationEvent event, boolean silentlyFail, final ResourceReference... references) {
         Map.Entry<UUID[], Integer> pair = buildReferences(resourceId, silentlyFail, references);
+        logAction("Registering Advanced Creation Event for resource '{}' associated with '{}' with priority {}", resourceId, associatedResourceId, pair.getValue());
         register(pair.getValue(), associatedResourceId, resourceId, event, silentlyFail, pair.getKey());
     }
 
     public static void registerDeletionEvent(int priority, ResourceLocation resourceId, ResourceLocation eventId, final DeletionEvent event, boolean silentlyFail) {
+        logAction("Registering Deletion Event '{}' on resource '{}' with priority {}", eventId, resourceId, priority);
         register(priority, resourceId, eventId, event, silentlyFail);
     }
 
     public static void registerDeletionEvent(int priority, ResourceLocation resourceId, ResourceLocation eventId, final AdvancedDeletionEvent event, boolean silentlyFail, final ResourceReference... references) {
+        logAction("Registering Advanced Deletion Event '{}' on resource '{}' with priority {}", eventId, resourceId, priority);
         register(priority, resourceId, eventId, event, silentlyFail);
     }
 
@@ -70,7 +77,11 @@ public class Mixson {
         for (List<AssociatedMixsonEvent> eventSet : events.values()) for (AssociatedMixsonEvent event : eventSet) {
             if(!event.resourceId().equals(id)) continue;
             switch (event.event()) {
-                case MixsonEventTypes.Creation unused -> original.add(buildResource(original.getFirst(), runCreationEvent(event)));
+                case MixsonEventTypes.Creation unused -> {
+                    JsonElement val = runCreationEvent(event);
+                    if(val == null) continue;
+                    original.add(buildResource(original.getFirst(), val));
+                }
                 case MixsonEventTypes.Deletion unused -> { if (runDeletionEvent(event)) return List.of(); }
                 case MixsonEventTypes.Modification unused -> {
                     for (int i = 0; i < original.size(); i++) {
@@ -98,7 +109,11 @@ public class Mixson {
         for (List<AssociatedMixsonEvent> eventSet : Mixson.events.sequencedValues()) for (AssociatedMixsonEvent event : eventSet) {
             if (!original.containsKey(event.resourceId())) continue;
             switch (event.event()) {
-                case MixsonEventTypes.Creation unused -> original.put(event.eventId(), buildResource(original.get(event.resourceId()), runCreationEvent(event)));
+                case MixsonEventTypes.Creation unused -> {
+                    JsonElement val = runCreationEvent(event);
+                    if(val == null) continue;
+                    original.put(event.eventId(), buildResource(original.get(event.resourceId()), val));
+                }
                 case MixsonEventTypes.Deletion unused -> { if (runDeletionEvent(event)) original.remove(event.resourceId()); }
                 case MixsonEventTypes.Modification unused -> {
                     try {
@@ -122,6 +137,7 @@ public class Mixson {
     // INTERNAL RUN METHODS
 
     private static boolean runDeletionEvent(AssociatedMixsonEvent event) {
+        logAction("Running Deletion Event '{}' on resource '{}'", event.eventId(), event.resourceId());
         if(event.referenceIds().length == 0) {
             if(event.event() instanceof DeletionEvent simpleEvent) return simpleEvent.run();
             else throw new MixsonError("Creation Events with no resource references must be of type DeletionEvent");
@@ -134,6 +150,7 @@ public class Mixson {
     }
 
     private static JsonElement runCreationEvent(AssociatedMixsonEvent event) {
+        logAction("Running Creation Event '{}' on resource '{}'", event.eventId(), event.resourceId());
         if(event.referenceIds().length == 0) {
             if(event.event() instanceof CreationEvent simpleEvent) return simpleEvent.run();
             else throw new MixsonError("Creation Events with no resource references must be of type CreationEvent");
@@ -146,6 +163,7 @@ public class Mixson {
     }
 
     private static JsonElement runModificationEvent(AssociatedMixsonEvent event, JsonElement elem) {
+        logAction("Running Modification Event '{}' on resource '{}'", event.eventId(), event.resourceId());
         if(event.referenceIds().length == 0) {
             if(event.event() instanceof ModificationEvent simpleEvent) return simpleEvent.run(elem);
             else throw new MixsonError("Modification Events with no resource references must be of type ModificationEvent");
@@ -166,12 +184,35 @@ public class Mixson {
     }
 
     public static boolean removeEvent(ResourceLocation eventId) {
+        logAction("Removing event '{}'", eventId);
         for(List<AssociatedMixsonEvent> eventSet : events.values())
             for(AssociatedMixsonEvent event : eventSet) if(event.eventId().equals(eventId)) {
                 eventSet.remove(event);
                 return true;
             }
         return false;
+    }
+
+    // DEBUGGING STUFF
+
+    /**
+     * Beta Feature for an upcoming version. Not fully implemented
+     **/
+    public static void setDebugMode(DebugMode debugMode) {
+        Mixson.debugMode = debugMode;
+        LOGGER.info("Mixson Debug Mode has been set to: {}", debugMode);
+    }
+
+    private static void logAction(String action, Object... args) {
+        if(debugMode.ordinal() > 0) LOGGER.info(action, args);
+    }
+
+    public enum DebugMode {
+
+        OFF,
+        LOG,
+        EXPORT
+
     }
 
     // BUILD METHODS
