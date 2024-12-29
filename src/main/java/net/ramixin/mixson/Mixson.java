@@ -1,15 +1,20 @@
 package net.ramixin.mixson;
 
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
+import net.neoforged.fml.loading.FMLPaths;
 import net.ramixin.mixson.events.*;
+import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 
 @SuppressWarnings("unused")
@@ -19,6 +24,7 @@ public class Mixson {
     private static DebugMode debugMode = DebugMode.OFF;
     private static final TreeMap<Integer, List<AssociatedMixsonEvent>> events = new TreeMap<>();
     private static final HashMap<UUID, BuiltResourceReference> references = new HashMap<>();
+    private static final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     public static final int DEFAULT_PRIORITY = 1000;
 
     // REGISTRATION METHODS
@@ -80,19 +86,29 @@ public class Mixson {
                 case MixsonEventTypes.Creation unused -> {
                     JsonElement val = runCreationEvent(event);
                     if(val == null) continue;
+                    exportJson(gson.toJson(val), event.resourceId(), event.eventId());
                     original.add(buildResource(original.getFirst(), val));
                 }
-                case MixsonEventTypes.Deletion unused -> { if (runDeletionEvent(event)) return List.of(); }
+                case MixsonEventTypes.Deletion unused -> {
+                    if (runDeletionEvent(event)) {
+                        exportJson("[ \"resource was deleted\" ]", event.resourceId(), event.eventId());
+                        return List.of();
+                    }
+                }
                 case MixsonEventTypes.Modification unused -> {
+                    JsonArray array = new JsonArray();
                     for (int i = 0; i < original.size(); i++) {
                         try {
                             if(modifiedEntries[i] == null) modifiedEntries[i] = JsonParser.parseReader(original.get(i).openAsReader());
                             JsonElement elem = modifiedEntries[i].getAsJsonObject();
-                            modifiedEntries[i] = runModificationEvent(event, elem);
+                            JsonElement modifiedElem = runModificationEvent(event, elem);
+                            array.add(modifiedElem);
+                            modifiedEntries[i] = modifiedElem;
                         } catch (Exception e) {
                             error(e, event);
                         }
                     }
+                    exportJson(gson.toJson(array), event.resourceId(), event.eventId());
                 }
                 default -> throw new IllegalStateException("Unexpected value: " + event.event());
             }
@@ -112,13 +128,21 @@ public class Mixson {
                 case MixsonEventTypes.Creation unused -> {
                     JsonElement val = runCreationEvent(event);
                     if(val == null) continue;
+                    exportJson(gson.toJson(val), event.resourceId(), event.eventId());
                     original.put(event.eventId(), buildResource(original.get(event.resourceId()), val));
                 }
-                case MixsonEventTypes.Deletion unused -> { if (runDeletionEvent(event)) original.remove(event.resourceId()); }
+                case MixsonEventTypes.Deletion unused -> {
+                    if (runDeletionEvent(event)) {
+                        exportJson("[ \"resource was deleted\" ]", event.resourceId(), event.eventId());
+                        original.remove(event.resourceId());
+                    }
+                }
                 case MixsonEventTypes.Modification unused -> {
                     try {
                         JsonElement elem = modifiedEntries.getOrDefault(event.resourceId(), JsonParser.parseReader(original.get(event.resourceId()).openAsReader()));
-                        modifiedEntries.put(event.resourceId(), runModificationEvent(event, elem));
+                        JsonElement modifiedElem = runModificationEvent(event, elem);
+                        exportJson(gson.toJson(modifiedElem), event.resourceId(), event.eventId());
+                        modifiedEntries.put(event.resourceId(), modifiedElem);
                     } catch (Exception e) {
                         error(e, event);
                     }
@@ -140,12 +164,12 @@ public class Mixson {
         logAction("Running Deletion Event '{}' on resource '{}'", event.eventId(), event.resourceId());
         if(event.referenceIds().length == 0) {
             if(event.event() instanceof DeletionEvent simpleEvent) return simpleEvent.run();
-            else throw new MixsonError("Creation Events with no resource references must be of type DeletionEvent");
+            else throw new MixsonError("Deletion Events with no resource references must be of type DeletionEvent");
         } else {
             if(event.event() instanceof AdvancedDeletionEvent advancedEvent) {
                 return advancedEvent.run(buildUsableReferences(event));
             }
-            else throw new MixsonError("Creation Events with resource references must be of type AdvancedDeletionEvent");
+            else throw new MixsonError("Deletion Events with resource references must be of type AdvancedDeletionEvent");
         }
     }
 
@@ -195,9 +219,6 @@ public class Mixson {
 
     // DEBUGGING STUFF
 
-    /**
-     * Beta Feature for an upcoming version. Not fully implemented
-     **/
     public static void setDebugMode(DebugMode debugMode) {
         Mixson.debugMode = debugMode;
         LOGGER.info("Mixson Debug Mode has been set to: {}", debugMode);
@@ -205,6 +226,35 @@ public class Mixson {
 
     private static void logAction(String action, Object... args) {
         if(debugMode.ordinal() > 0) LOGGER.info(action, args);
+    }
+
+    private static void exportJson(String text, ResourceLocation resourceId, ResourceLocation eventId) {
+        if(debugMode.ordinal() <= 1) return;
+
+        Path dir = FMLPaths.GAMEDIR.get().resolve(".mixson").resolve(identifierToPathString(resourceId));
+        try {
+            Files.createDirectories(dir);
+            FileWriter writer = new FileWriter(dir.resolve(identifierToPathString(eventId)+".json").toFile());
+            writer.write(text);
+            writer.close();
+        } catch (IOException e) {
+            Mixson.LOGGER.error("failed to export debug file", e);
+        }
+
+    }
+
+    private static String identifierToPathString(ResourceLocation ResourceLocation) {
+        return ResourceLocation.getNamespace() + '~' + ResourceLocation.getPath().replaceFirst("\\.json", "").replaceAll("/", "-");
+    }
+
+    static {
+
+        try {
+            FileUtils.deleteDirectory(FMLPaths.GAMEDIR.get().resolve(".mixson").toFile());
+        } catch (IOException e) {
+            Mixson.LOGGER.error("failed to delete .mixson debug directory", e);
+        }
+
     }
 
     public enum DebugMode {
