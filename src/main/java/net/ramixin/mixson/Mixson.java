@@ -39,40 +39,40 @@ public class Mixson {
 
     public static void registerModificationEvent(int priority, ResourceLocation resourceId, ResourceLocation eventId, final ModificationEvent event, boolean silentlyFail) {
         logAction("Registering Modification Event '{}' on resource '{}' with priority {}", eventId, resourceId, priority);
-        register(priority, resourceId, eventId, event, silentlyFail);
+        register(priority, resourceId, eventId, event, silentlyFail, false);
     }
 
     public static void registerModificationEvent(int priority, ResourceLocation resourceId, ResourceLocation eventId, final AdvancedModificationEvent event, boolean silentlyFail, final ResourceReference... references) {
         logAction("Registering Advanced Modification Event '{}' on resource '{}' with priority {}", eventId, resourceId, priority);
-        register(priority, resourceId, eventId, event, silentlyFail, buildReferences(eventId, silentlyFail, references).getKey());
+        register(priority, resourceId, eventId, event, silentlyFail, false, buildReferences(eventId, silentlyFail, references).getKey());
     }
 
     public static void registerCreationEvent(ResourceLocation associatedResourceId, ResourceLocation resourceId, final CreationEvent event, boolean silentlyFail) {
         logAction("Registering Creation Event for resource '{}' associated with '{}' with priority {}", resourceId, associatedResourceId, DEFAULT_PRIORITY);
-        register(DEFAULT_PRIORITY, associatedResourceId, resourceId, event, silentlyFail);
+        register(DEFAULT_PRIORITY, associatedResourceId, resourceId, event, silentlyFail, false);
     }
 
     public static void registerCreationEvent(ResourceLocation associatedResourceId, ResourceLocation resourceId, final AdvancedCreationEvent event, boolean silentlyFail, final ResourceReference... references) {
         Map.Entry<UUID[], Integer> pair = buildReferences(resourceId, silentlyFail, references);
         logAction("Registering Advanced Creation Event for resource '{}' associated with '{}' with priority {}", resourceId, associatedResourceId, pair.getValue());
-        register(pair.getValue(), associatedResourceId, resourceId, event, silentlyFail, pair.getKey());
+        register(pair.getValue(), associatedResourceId, resourceId, event, silentlyFail, false, pair.getKey());
     }
 
     public static void registerDeletionEvent(int priority, ResourceLocation resourceId, ResourceLocation eventId, final DeletionEvent event, boolean silentlyFail) {
         logAction("Registering Deletion Event '{}' on resource '{}' with priority {}", eventId, resourceId, priority);
-        register(priority, resourceId, eventId, event, silentlyFail);
+        register(priority, resourceId, eventId, event, silentlyFail, false);
     }
 
     public static void registerDeletionEvent(int priority, ResourceLocation resourceId, ResourceLocation eventId, final AdvancedDeletionEvent event, boolean silentlyFail, final ResourceReference... references) {
         logAction("Registering Advanced Deletion Event '{}' on resource '{}' with priority {}", eventId, resourceId, priority);
-        register(priority, resourceId, eventId, event, silentlyFail);
+        register(priority, resourceId, eventId, event, silentlyFail, false);
     }
 
-    private static void register(int priority, ResourceLocation resourceId, ResourceLocation eventId, MixsonEventTypes.BaseEvent event, boolean silentlyFail, final UUID... referenceIds) {
+    private static void register(int priority, ResourceLocation resourceId, ResourceLocation eventId, MixsonEventTypes.BaseEvent event, boolean silentlyFail, boolean referenceEvent, final UUID... referenceIds) {
         List<AssociatedMixsonEvent> eventSet;
         if(events.get(priority) == null) eventSet = new ArrayList<>();
         else eventSet = events.get(priority);
-        eventSet.add(new AssociatedMixsonEvent(resourceId.withSuffix(".json"), eventId.withSuffix(".json"), event, silentlyFail, referenceIds));
+        eventSet.add(new AssociatedMixsonEvent(resourceId.withSuffix(".json"), eventId.withSuffix(".json"), event, silentlyFail, referenceEvent, referenceIds));
         events.put(priority, eventSet);
     }
 
@@ -86,12 +86,12 @@ public class Mixson {
                 case MixsonEventTypes.Creation unused -> {
                     JsonElement val = runCreationEvent(event);
                     if(val == null) continue;
-                    exportJson(gson.toJson(val), event.resourceId(), event.eventId());
+                    exportJson(gson.toJson(val), event);
                     original.add(buildResource(original.getFirst(), val));
                 }
                 case MixsonEventTypes.Deletion unused -> {
                     if (runDeletionEvent(event)) {
-                        exportJson("[ \"resource was deleted\" ]", event.resourceId(), event.eventId());
+                        exportJson("[ \"resource was deleted\" ]", event);
                         return List.of();
                     }
                 }
@@ -108,7 +108,7 @@ public class Mixson {
                             error(e, event);
                         }
                     }
-                    exportJson(gson.toJson(array), event.resourceId(), event.eventId());
+                    exportJson(gson.toJson(array), event);
                 }
                 default -> throw new IllegalStateException("Unexpected value: " + event.event());
             }
@@ -128,12 +128,12 @@ public class Mixson {
                 case MixsonEventTypes.Creation unused -> {
                     JsonElement val = runCreationEvent(event);
                     if(val == null) continue;
-                    exportJson(gson.toJson(val), event.resourceId(), event.eventId());
+                    exportJson(gson.toJson(val), event);
                     original.put(event.eventId(), buildResource(original.get(event.resourceId()), val));
                 }
                 case MixsonEventTypes.Deletion unused -> {
                     if (runDeletionEvent(event)) {
-                        exportJson("[ \"resource was deleted\" ]", event.resourceId(), event.eventId());
+                        exportJson("[ \"resource was deleted\" ]", event);
                         original.remove(event.resourceId());
                     }
                 }
@@ -141,7 +141,7 @@ public class Mixson {
                     try {
                         JsonElement elem = modifiedEntries.getOrDefault(event.resourceId(), JsonParser.parseReader(original.get(event.resourceId()).openAsReader()));
                         JsonElement modifiedElem = runModificationEvent(event, elem);
-                        exportJson(gson.toJson(modifiedElem), event.resourceId(), event.eventId());
+                        exportJson(gson.toJson(modifiedElem), event);
                         modifiedEntries.put(event.resourceId(), modifiedElem);
                     } catch (Exception e) {
                         error(e, event);
@@ -228,13 +228,13 @@ public class Mixson {
         if(debugMode.ordinal() > 0) LOGGER.info(action, args);
     }
 
-    private static void exportJson(String text, ResourceLocation resourceId, ResourceLocation eventId) {
+    private static void exportJson(String text, AssociatedMixsonEvent event) {
         if(debugMode.ordinal() <= 1) return;
-
-        Path dir = FMLPaths.GAMEDIR.get().resolve(".mixson").resolve(identifierToPathString(resourceId));
+        if(event.referenceEvent()) return;
+        Path dir = FMLPaths.GAMEDIR.get().resolve(".mixson").resolve(identifierToPathString(event.resourceId()));
         try {
             Files.createDirectories(dir);
-            FileWriter writer = new FileWriter(dir.resolve(identifierToPathString(eventId)+".json").toFile());
+            FileWriter writer = new FileWriter(dir.resolve(identifierToPathString(event.eventId())+".json").toFile());
             writer.write(text);
             writer.close();
         } catch (IOException e) {
@@ -291,7 +291,7 @@ public class Mixson {
             register(ref.priority(), ref.resourceId(), ResourceLocation.fromNamespaceAndPath("mixson", "reference_event_" + eventId.getPath()), (ModificationEvent) (elem) -> {
                 Mixson.references.get(referenceUUID).fulfill(elem);
                 return elem;
-            }, silentlyFail);
+            }, silentlyFail, true);
             Mixson.references.put(referenceUUID, new BuiltResourceReference(ref.resourceId(), ref.referenceId()));
         }
         return Map.entry(referenceIds, highest);
