@@ -8,4 +8,8 @@ public interface ModificationEvent extends MixsonEventTypes.Modification {
 
     @NotNull JsonElement run(JsonElement elem);
 
+    @Override
+    default String getName() {
+        return "Modification Event";
+    }
 }

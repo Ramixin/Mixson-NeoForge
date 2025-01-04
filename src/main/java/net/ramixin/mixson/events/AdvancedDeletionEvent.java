@@ -9,5 +9,9 @@ import java.util.HashMap;
 public interface AdvancedDeletionEvent extends MixsonEventTypes.Deletion {
     
     boolean run(HashMap<ResourceLocation, BuiltResourceReference> references);
-    
+
+    @Override
+    default String getName() {
+        return "Advanced Deletion Event";
+    }
 }

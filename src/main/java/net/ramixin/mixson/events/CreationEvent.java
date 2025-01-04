@@ -8,4 +8,8 @@ public interface CreationEvent extends MixsonEventTypes.Creation {
 
     @Nullable JsonElement run();
 
+    @Override
+    default String getName() {
+        return "Creation Event";
+    }
 }

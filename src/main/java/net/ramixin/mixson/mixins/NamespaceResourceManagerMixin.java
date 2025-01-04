@@ -17,7 +17,7 @@ public class NamespaceResourceManagerMixin {
 
     @ModifyReturnValue(method = "getResourceStack", at = @At("RETURN"))
     private List<Resource> runMixsonEvents(List<Resource> original, @Local(argsOnly = true) ResourceLocation id) {
-        return Mixson.runEvents(original, id);
+        return Mixson.runNamespaceEvents(original, id);
     }
 
 }

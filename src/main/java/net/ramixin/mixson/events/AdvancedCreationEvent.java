@@ -12,4 +12,8 @@ public interface AdvancedCreationEvent extends MixsonEventTypes.Creation {
 
     @Nullable JsonElement run(HashMap<ResourceLocation, BuiltResourceReference> references);
 
+    @Override
+    default String getName() {
+        return "Advanced Creation Event";
+    }
 }
