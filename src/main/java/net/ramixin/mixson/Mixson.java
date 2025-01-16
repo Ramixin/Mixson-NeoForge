@@ -6,9 +6,13 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLPaths;
+import net.neoforged.fml.loading.moddiscovery.NightConfigWrapper;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforgespi.language.IConfigurable;
+import net.ramixin.mixson.atp.MixsonAnnotationProcessor;
 import net.ramixin.mixson.debug.CallCountEntry;
 import net.ramixin.mixson.debug.DebugMode;
 import net.ramixin.mixson.debug.MixsonCommand;
@@ -39,8 +43,26 @@ public final class Mixson {
 
 
     public Mixson(IEventBus bus, ModContainer container) {
+        ModList.get().forEachModContainer((unused, modContainer) -> {
+            List<? extends IConfigurable> mixsonConfig = modContainer.getModInfo().getOwningFile().getConfig().getConfigList("mixson");
+            for(IConfigurable configurable : mixsonConfig) {
+                if(!(configurable instanceof NightConfigWrapper wrapper)) continue;
+                Optional<Object> maybeEntries = wrapper.getConfigElement("config");
+                if(maybeEntries.isEmpty()) continue;
+                String id = modContainer.getModId();
+                if(!(maybeEntries.get() instanceof List<?> list)) throw new IllegalStateException("config field in [[mixson]] section must be a list of strings in mod +'"+id+"'");
+                for(Object entry : list) {
+                    if(!(entry instanceof String className)) throw new IllegalStateException("config field in [[mixson]] section mustonly contain strings, but found: "+entry+" in mod '"+id+"'");
+                    try {
+                        MixsonAnnotationProcessor.processClass(Class.forName(className), Mixson::logAction);
+                    } catch (ClassNotFoundException e) {
+                        throw new MixsonError(String.format("class '%s' in 'mixson' field in mod '%s' does not exist", className, id));
+                    }
+                }
+            }
+        });
         NeoForge.EVENT_BUS.register(MixsonCommand.class);
-        //TestModInitializer.onInitialize();
+
     }
 
     // REGISTRATION METHODS
