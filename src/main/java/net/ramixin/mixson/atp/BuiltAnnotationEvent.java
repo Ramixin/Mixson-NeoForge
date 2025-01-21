@@ -1,8 +1,8 @@
 package net.ramixin.mixson.atp;
 
-public record BuiltAnnotationEvent(String[] resourceIds, String eventId, int priority, boolean failSilently, int ordinal, MixsonEventType eventType) {
+public record BuiltAnnotationEvent(String[] resourceIds, String eventName, int priority, boolean failSilently, int ordinal) {
 
-    public static String generateEventId(String methodName) {
+    public static String generateEventName(String methodName) {
         StringBuilder buffer = new StringBuilder(methodName.length());
         for(int i = 0; i < methodName.length(); i++) {
             char c = methodName.charAt(i);

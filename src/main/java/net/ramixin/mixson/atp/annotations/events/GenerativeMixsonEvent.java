@@ -1,8 +1,7 @@
 package net.ramixin.mixson.atp.annotations.events;
 
-import net.ramixin.mixson.Mixson;
 import net.ramixin.mixson.atp.BuiltAnnotationEvent;
-import net.ramixin.mixson.atp.MixsonEventType;
+import net.ramixin.mixson.inline.Mixson;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -11,7 +10,7 @@ import java.lang.annotation.Target;
 
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface GenerativeModificationEvent {
+public @interface GenerativeMixsonEvent {
 
     String value();
 
@@ -24,16 +23,14 @@ public @interface GenerativeModificationEvent {
     boolean external() default false;
 
     interface Builder {
-        static BuiltAnnotationEvent build(GenerativeModificationEvent modificationEvent, String resourceId, String eventId) {
+        static BuiltAnnotationEvent build(GenerativeMixsonEvent event, String resourceId, String eventName) {
             return new BuiltAnnotationEvent(
                     new String[]{resourceId},
-                    eventId,
-                    modificationEvent.priority(),
-                    modificationEvent.failSilently(),
-                    modificationEvent.ordinal(),
-                    MixsonEventType.MODIFICATION
+                    eventName,
+                    event.priority(),
+                    event.failSilently(),
+                    event.ordinal()
             );
         }
     }
-
 }

@@ -1,6 +1,6 @@
 package net.ramixin.mixson.atp.annotations;
 
-import net.ramixin.mixson.Mixson;
+import net.ramixin.mixson.inline.Mixson;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

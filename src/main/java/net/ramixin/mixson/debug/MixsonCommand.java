@@ -2,21 +2,18 @@ package net.ramixin.mixson.debug;
 
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
-import net.ramixin.mixson.Mixson;
+import net.ramixin.mixson.inline.Mixson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
-@EventBusSubscriber(modid = "mixson", bus = EventBusSubscriber.Bus.GAME)
+
 public class MixsonCommand {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger("Mixson Command");
+    private static final Logger LOGGER = LoggerFactory.getLogger("Mixson Debug");
 
     @SubscribeEvent()
     public static void onInitialize(RegisterCommandsEvent event) {
@@ -41,23 +38,25 @@ public class MixsonCommand {
 
     private static List<String> buildOutput() {
         List<String> list = new ArrayList<>();
-        final List<ResourceLocation> eventIds = Mixson.callCountsSet();
-        if(eventIds.isEmpty()) {
+        final List<UUID> order = Mixson.getCallCountsOrder();
+        LinkedHashMap<String, CallCountEntry> map = new LinkedHashMap<>();
+        if(order.isEmpty()) {
             String spacer = "-".repeat(30);
             list.add(spacer);
             list.add("no events have been called yet");
             list.add(spacer);
             return list;
         }
+        for(UUID uuid : order) map.put(Mixson.getEventName(uuid), Mixson.getCallCount(uuid));
         int eventNameSpacing = 9;
-        for(ResourceLocation eventId : eventIds) if(eventId.toString().length() > eventNameSpacing) eventNameSpacing = eventId.toString().length();
+        for(String eventName : map.keySet()) if(eventName.length() > eventNameSpacing) eventNameSpacing = eventName.length();
         eventNameSpacing++;
         list.add(fillToLength("event id ", eventNameSpacing)+"| Calls | File Operations");
         String spacer = "-".repeat(25 + eventNameSpacing);
         list.add(spacer);
-        for(ResourceLocation eventId : eventIds) {
-            CallCountEntry entry = Mixson.getCallCount(eventId);
-            list.add(fillToLength(eventId.toString(), eventNameSpacing) + "| "+fillToLength(String.valueOf(entry.eventCalls()), 6)+"| "+entry.fileOperations());
+        for(Map.Entry<String, CallCountEntry> sequencedEntry : map.sequencedEntrySet()) {
+            CallCountEntry callCountEntry = sequencedEntry.getValue();
+            list.add(fillToLength(sequencedEntry.getKey(), eventNameSpacing) + "| "+fillToLength(String.valueOf(callCountEntry.eventCalls()), 6)+"| "+callCountEntry.fileOperations());
         }
         list.add(spacer);
         return list;
