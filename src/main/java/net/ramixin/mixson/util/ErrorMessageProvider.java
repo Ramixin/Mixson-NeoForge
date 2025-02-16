@@ -1,4 +1,4 @@
-package net.ramixin.mixson.inline;
+package net.ramixin.mixson.util;
 
 public interface ErrorMessageProvider {
 

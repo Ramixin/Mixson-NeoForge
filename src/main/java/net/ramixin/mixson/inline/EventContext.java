@@ -1,37 +1,36 @@
 package net.ramixin.mixson.inline;
 
-import com.google.gson.JsonElement;
 import net.minecraft.resources.ResourceLocation;
 import net.ramixin.mixson.HexRecord;
-import net.ramixin.mixson.inline.events.MixsonEvent;
+import net.ramixin.mixson.inline.entries.EventEntry;
 
 import java.util.*;
 
 @SuppressWarnings("unused")
-public class EventContext {
+public class EventContext<T> {
 
     private final ContextCreationType creationType;
-    private final JsonElement file;
+    private final T file;
     private final ResourceLocation resourceId;
-    private final EventEntry entry;
-    private final HashMap<ResourceLocation, BuiltResourceReference> references = new HashMap<>();
+    private final EventEntry<T> entry;
+    private final HashMap<ResourceLocation, BuiltResourceReference<T>> references = new HashMap<>();
     private boolean markedForDeletion;
     private final Set<UUID> cancelledFutures = new HashSet<>();
-    private final HashMap<ResourceLocation, JsonElement> identifiedCreatedResources = new HashMap<>();
-    private final List<JsonElement> indexedCreatedResources = new ArrayList<>();
-    private final List<HexRecord<Integer, String, String, MixsonEvent, Boolean, ResourceReference[]>> createdRuntimeEvents = new ArrayList<>();
-    private final List<HexRecord<Integer, String, String, MixsonEvent, Boolean, ResourceReference[]>> createdEvents = new ArrayList<>();
+    private final HashMap<ResourceLocation, T> identifiedCreatedResources = new HashMap<>();
+    private final List<T> indexedCreatedResources = new ArrayList<>();
+    private final List<HexRecord<Integer, String, String, MixsonEvent<T>, Boolean, ResourceReference[]>> createdRuntimeEvents = new ArrayList<>();
+    private final List<HexRecord<Integer, String, String, MixsonEvent<T>, Boolean, ResourceReference[]>> createdEvents = new ArrayList<>();
 
-    protected EventContext(ContextCreationType creationType, JsonElement file, ResourceLocation resourceId, EventEntry entry, boolean markedForDeletion, BuiltResourceReference... references) {
+    public EventContext(ContextCreationType creationType, T file, ResourceLocation resourceId, EventEntry<T> entry, boolean markedForDeletion, BuiltResourceReference<T>[] references) {
         this.creationType = creationType;
         this.file = file;
         this.resourceId = resourceId;
         this.entry = entry;
         this.markedForDeletion = markedForDeletion;
-        for(BuiltResourceReference ref : references) this.references.put(ref.getReferenceId(), ref);
+        for(BuiltResourceReference<T> ref : references) this.references.put(ref.getReferenceId(), ref);
     }
 
-    public JsonElement getFile() {
+    public T getFile() {
         return this.file;
     }
 
@@ -43,7 +42,7 @@ public class EventContext {
         return getEvent().eventName();
     }
 
-    public BuiltMixsonEvent getEvent() {
+    public BuiltMixsonEvent<T> getEvent() {
         return entry.event();
     }
 
@@ -51,7 +50,7 @@ public class EventContext {
         return entry.priority();
     }
 
-    public BuiltResourceReference getReference(String id) {
+    public BuiltResourceReference<T> getReference(String id) {
         return this.references.get(ResourceLocation.parse(id));
     }
 
@@ -59,21 +58,21 @@ public class EventContext {
         this.markedForDeletion = shouldDelete;
     }
 
-    public void createResource(ResourceLocation id, JsonElement elem) {
+    public void createResource(ResourceLocation id, T elem) {
         if(creationType != ContextCreationType.IDENTIFIED) throw new IllegalCallerException(String.format("cannot created identified resources for event '%s'", getEventName()));
         this.identifiedCreatedResources.put(id, elem);
     }
 
-    public void createResource(JsonElement elem) {
+    public void createResource(T elem) {
         if(creationType != ContextCreationType.INDEXED) throw new IllegalCallerException(String.format("cannot created indexed resources for event '%s'", getEventName()));
         this.indexedCreatedResources.add(elem);
     }
 
-    protected HashMap<ResourceLocation, JsonElement> getIdentifiedCreatedResources() {
+    protected HashMap<ResourceLocation, T> getIdentifiedCreatedResources() {
         return this.identifiedCreatedResources;
     }
 
-    protected List<JsonElement> getIndexedCreatedResources() {
+    protected List<T> getIndexedCreatedResources() {
         return indexedCreatedResources;
     }
 
@@ -81,19 +80,19 @@ public class EventContext {
         this.cancelledFutures.add(uuid);
     }
 
-    public void registerRuntimeEvent(int priority, String resourceId, String eventName, MixsonEvent event, boolean failSilently, ResourceReference... references) {
+    public void registerRuntimeEvent(int priority, String resourceId, String eventName, MixsonEvent<T> event, boolean failSilently, ResourceReference... references) {
         createdRuntimeEvents.add(new HexRecord<>(priority, resourceId, eventName, event, failSilently, references));
     }
 
-    public void registerDualEvent(int priority, String resourceId, String eventName, MixsonEvent event, boolean failSilently, ResourceReference... references) {
+    public void registerDualEvent(int priority, String resourceId, String eventName, MixsonEvent<T> event, boolean failSilently, ResourceReference... references) {
         createdEvents.add(new HexRecord<>(priority, resourceId, eventName, event, failSilently, references));
     }
 
-    protected List<HexRecord<Integer, String, String, MixsonEvent, Boolean, ResourceReference[]>> getCreatedRuntimeEvents() {
+    protected List<HexRecord<Integer, String, String, MixsonEvent<T>, Boolean, ResourceReference[]>> getCreatedRuntimeEvents() {
         return createdRuntimeEvents;
     }
 
-    protected List<HexRecord<Integer, String, String, MixsonEvent, Boolean, ResourceReference[]>> getCreatedEvents() {
+    protected List<HexRecord<Integer, String, String, MixsonEvent<T>, Boolean, ResourceReference[]>> getCreatedEvents() {
         return createdEvents;
     }
 

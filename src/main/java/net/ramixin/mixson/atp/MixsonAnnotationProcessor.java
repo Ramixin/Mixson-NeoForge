@@ -1,5 +1,6 @@
 package net.ramixin.mixson.atp;
 
+import net.ramixin.mixson.atp.annotations.Codec;
 import net.ramixin.mixson.atp.annotations.Generator;
 import net.ramixin.mixson.atp.annotations.events.GenerativeMixsonEvent;
 import net.ramixin.mixson.atp.annotations.events.MixsonEvent;
@@ -24,20 +25,19 @@ public class MixsonAnnotationProcessor {
     }
 
     private static void processMethod(Method method) {
-        System.out.println("processing method: " + method.getName());
-        enforceExclusivity(method, MixsonEvent.class, GenerativeMixsonEvent.class);
+        enforceExclusivity(method, MixsonEvent.class, GenerativeMixsonEvent.class, Generator.class, Codec.class);
         processAnnotation(MixsonEvent.class, method, EventProcessors::handleMixsonEvent);
         processAnnotation(GenerativeMixsonEvent.class, method, EventProcessors::handleGenerativeMixsonEvent);
     }
 
     private static void preprocessMethod(Method method) {
         processAnnotation(Generator.class, method, EventPreprocessors::handleGenerator);
+        processAnnotation(Codec.class, method, EventPreprocessors::handleCodec);
     }
 
     private static <T extends Annotation> void processAnnotation(Class<T> annotationClazz, Method method, TriConsumer<T, Method, Logger> callback) {
         T annotation = method.getAnnotation(annotationClazz);
         if(annotation == null) return;
-        System.out.println("processing annotation: " + annotation);
         callback.accept(annotation, method, MixsonAnnotationProcessor.LOGGER);
     }
 
@@ -46,7 +46,7 @@ public class MixsonAnnotationProcessor {
         boolean safe = true;
         for(Class<? extends Annotation> annotation : annotations) if(method.isAnnotationPresent(annotation)) {
             if(safe) safe = false;
-            else throw new IllegalStateException(String.format("method '%s' has multiple annotations of type '%s'", method.getName(), Arrays.stream(annotations).map(Class::getName).collect(Collectors.toList())));
+            else throw new IllegalStateException(String.format("method '%s' can only be annotated with one of the following: '%s'", method.getName(), Arrays.stream(annotations).map(Class::getName).collect(Collectors.toList())));
         }
     }
 }

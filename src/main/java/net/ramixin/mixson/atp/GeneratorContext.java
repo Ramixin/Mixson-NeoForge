@@ -7,8 +7,8 @@ import java.util.List;
 
 public class GeneratorContext {
 
-    List<String> resourceIds = new ArrayList<>();
-    List<String> eventIds = new ArrayList<>();
+    private final List<String> resourceIds = new ArrayList<>();
+    private final List<String> eventIds = new ArrayList<>();
 
     public GeneratorContext() {}
 

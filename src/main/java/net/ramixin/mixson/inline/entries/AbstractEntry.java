@@ -1,4 +1,4 @@
-package net.ramixin.mixson.inline;
+package net.ramixin.mixson.inline.entries;
 
 public abstract class AbstractEntry {
 

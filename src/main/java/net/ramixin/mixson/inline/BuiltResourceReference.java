@@ -1,14 +1,14 @@
 package net.ramixin.mixson.inline;
 
-import com.google.gson.JsonElement;
 import net.minecraft.resources.ResourceLocation;
+import net.ramixin.mixson.util.ErrorMessageProvider;
 
 import java.util.Optional;
 import java.util.UUID;
 
-public class BuiltResourceReference implements ErrorMessageProvider {
+public class BuiltResourceReference<T> implements ErrorMessageProvider {
 
-    private JsonElement resource;
+    private T resource;
 
     private final ResourceLocation referenceId;
 
@@ -18,21 +18,24 @@ public class BuiltResourceReference implements ErrorMessageProvider {
 
     private final UUID uuid = UUID.randomUUID();
 
-    protected BuiltResourceReference(ResourceReference reference) {
+    private final MixsonCodec<T> codec;
+
+    protected BuiltResourceReference(ResourceReference reference, MixsonCodec<T> codec) {
         if(reference.ordinal() == -1) throw new IllegalArgumentException(String.format("Ordinal for resource reference: %s cannot be -1", reference.referenceId()));
         if(reference.ordinal() < 0) throw new IllegalArgumentException(String.format("Ordinal for resource reference: %s cannot be negative", reference.referenceId()));
         this.resourceId = ResourceLocation.parse(reference.resourceId()).withSuffix(".json");
         this.referenceId = ResourceLocation.parse(reference.referenceId());
         this.ordinal = reference.ordinal();
+        this.codec = codec;
     }
 
-    public Optional<JsonElement> retrieve() {
+    public Optional<T> retrieve() {
         if(resource == null) return Optional.empty();
         return Optional.of(resource);
     }
 
-    protected void fulfill(JsonElement elem) {
-        this.resource = elem.deepCopy();
+    protected void fulfill(T elem) {
+        this.resource = elem;
     }
 
     public ResourceLocation getReferenceId() {
@@ -49,6 +52,10 @@ public class BuiltResourceReference implements ErrorMessageProvider {
 
     public int getOrdinal() {
         return ordinal;
+    }
+
+    public MixsonCodec<T> getCodec() {
+        return codec;
     }
 
     @Override

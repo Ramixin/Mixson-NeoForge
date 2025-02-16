@@ -2,6 +2,7 @@ package net.ramixin.mixson.atp.annotations.events;
 
 import net.ramixin.mixson.atp.BuiltAnnotationEvent;
 import net.ramixin.mixson.inline.Mixson;
+import net.ramixin.mixson.inline.MixsonCodec;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -22,14 +23,17 @@ public @interface MixsonEvent {
 
     int ordinal() default -1;
 
+    String codec() default "";
+
     interface Builder {
-        static BuiltAnnotationEvent build(MixsonEvent event, String methodName) {
-            return new BuiltAnnotationEvent(
+        static <T> BuiltAnnotationEvent<T> build(MixsonEvent event, String methodName, MixsonCodec<T> codec) {
+            return new BuiltAnnotationEvent<>(
                     event.value(),
                     event.eventName().isEmpty() ? BuiltAnnotationEvent.generateEventName(methodName) : event.eventName(),
                     event.priority(),
                     event.failSilently(),
-                    event.ordinal()
+                    event.ordinal(),
+                    codec
             );
         }
     }

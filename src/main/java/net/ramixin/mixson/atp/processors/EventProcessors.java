@@ -6,10 +6,7 @@ import net.ramixin.mixson.atp.BuiltAnnotationEvent;
 import net.ramixin.mixson.atp.annotations.Reference;
 import net.ramixin.mixson.atp.annotations.events.GenerativeMixsonEvent;
 import net.ramixin.mixson.atp.annotations.events.MixsonEvent;
-import net.ramixin.mixson.inline.BuiltResourceReference;
-import net.ramixin.mixson.inline.EventContext;
-import net.ramixin.mixson.inline.Mixson;
-import net.ramixin.mixson.inline.ResourceReference;
+import net.ramixin.mixson.inline.*;
 import org.slf4j.Logger;
 import oshi.util.tuples.Pair;
 
@@ -21,22 +18,28 @@ import java.util.List;
 
 public interface EventProcessors {
 
+    static MixsonCodec<?> getCodec(String codec, String eventName) {
+        MixsonCodec<?> mixsonCodec;
+        if(codec.isEmpty()) mixsonCodec = Mixson.JSON_ELEMENT_CODEC;
+        else mixsonCodec = EventPreprocessors.getCodec(codec);
+        if(mixsonCodec == null) throw new MixsonError("unknown codec identifier '%s' for event '%s'", codec, eventName);
+        return mixsonCodec;
+    }
+
     static void handleMixsonEvent(MixsonEvent event, Method method, Logger logger) {
-        System.out.println("handling MixsonEvent");
-        runRegisterAnnotation(MixsonEvent.Builder.build(event, method.getName()), method, logger);
+        runRegisterAnnotation(MixsonEvent.Builder.build(event, method.getName(), getCodec(event.codec(), event.eventName())), method, logger);
     }
 
     static void handleGenerativeMixsonEvent(GenerativeMixsonEvent event, Method method, Logger logger) {
-        System.out.println("handling GenerativeMixsonEvent");
         Pair<String[], String[]> context = EventPreprocessors.getGeneratedIdentifiers(event.value(), event.external(), method.getDeclaringClass());
         String[] resourceIds = context.getA();
         String[] eventIds = context.getB();
         for(int i = 0; resourceIds.length > i; i++) {
-            runRegisterAnnotation(GenerativeMixsonEvent.Builder.build(event, resourceIds[i], eventIds[i]), method, logger);
+            runRegisterAnnotation(GenerativeMixsonEvent.Builder.build(event, resourceIds[i], eventIds[i], getCodec(event.codec(), eventIds[i])), method, logger);
         }
     }
 
-    private static void runRegisterAnnotation(BuiltAnnotationEvent event, Method method, Logger logger) {
+    private static <T> void runRegisterAnnotation(BuiltAnnotationEvent<T> event, Method method, Logger logger) {
         String methodName = method.getName();
         if(method.getReturnType() != void.class) throw new MixsonError("method '%s' must have return type void", methodName);
         for(String resourceId : event.resourceIds()) if(resourceId.isEmpty()) throw new MixsonError("empty resource id found for method '%s'", methodName);
@@ -59,6 +62,7 @@ public interface EventProcessors {
         ResourceReference[] references = referencesList.toArray(ResourceReference[]::new);
         for(String resourceId : event.resourceIds()) {
             Mixson.registerEvent(
+                    event.codec(),
                     event.priority(),
                     resourceId,
                     event.eventName(),
@@ -82,7 +86,7 @@ public interface EventProcessors {
         return parameters;
     }
 
-    private static Object[] buildParameters(EventContext context, ResourceLocation[] referenceIds) {
+    private static <T> Object[] buildParameters(EventContext<T> context, ResourceLocation[] referenceIds) {
         Object[] parameters = new Object[referenceIds.length + 1];
         parameters[0] = context;
         for(int i = 0; i < referenceIds.length; i++) {
@@ -91,7 +95,7 @@ public interface EventProcessors {
         return parameters;
     }
 
-    private static void runEventIntermediate(Method method, EventContext context, ResourceLocation[] referenceIds, Logger logger) {
+    private static <T> void runEventIntermediate(Method method, EventContext<T> context, ResourceLocation[] referenceIds, Logger logger) {
         try {
             method.setAccessible(true);
             method.invoke(null, buildParameters(context, referenceIds));
