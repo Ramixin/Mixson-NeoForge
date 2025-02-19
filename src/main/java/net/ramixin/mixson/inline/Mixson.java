@@ -24,7 +24,6 @@ import net.ramixin.mixson.debug.MixsonCommand;
 import net.ramixin.mixson.inline.entries.AbstractEntry;
 import net.ramixin.mixson.inline.entries.EventEntry;
 import net.ramixin.mixson.inline.entries.ReferenceEntry;
-import net.ramixin.mixson.testing.TestModInitializer;
 import net.ramixin.mixson.util.ErrorMessageProvider;
 import net.ramixin.mixson.util.MixsonUtil;
 import org.apache.commons.io.FileUtils;
@@ -123,7 +122,7 @@ public final class Mixson {
             }
         });
         NeoForge.EVENT_BUS.register(MixsonCommand.class);
-        TestModInitializer.onInitialize();
+        //TestModInitializer.onInitialize();
     }
 
     // EXTERNAL RUN METHODS
