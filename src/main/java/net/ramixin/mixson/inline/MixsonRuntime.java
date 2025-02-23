@@ -5,6 +5,7 @@ import net.ramixin.mixson.inline.entries.EventEntry;
 import net.ramixin.mixson.inline.entries.ReferenceEntry;
 
 import java.util.*;
+import java.util.function.Function;
 
 public class MixsonRuntime {
 
@@ -58,6 +59,13 @@ public class MixsonRuntime {
                 return;
             }
         }
+    }
+
+    protected BuiltResourceReference<?> getReference(UUID uuid, Function<UUID, BuiltResourceReference<?>> globalCallback) {
+        BuiltResourceReference<?> reference;
+        if(runtimeReferences.containsKey(uuid)) reference = runtimeReferences.get(uuid);
+        else reference = globalCallback.apply(uuid);
+        return reference;
     }
 
 }
