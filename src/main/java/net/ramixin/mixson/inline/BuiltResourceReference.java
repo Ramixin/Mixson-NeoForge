@@ -23,7 +23,7 @@ public class BuiltResourceReference<T> implements ErrorMessageProvider {
     protected BuiltResourceReference(ResourceReference reference, MixsonCodec<T> codec) {
         if(reference.ordinal() == -1) throw new IllegalArgumentException(String.format("Ordinal for resource reference: %s cannot be -1", reference.referenceId()));
         if(reference.ordinal() < 0) throw new IllegalArgumentException(String.format("Ordinal for resource reference: %s cannot be negative", reference.referenceId()));
-        this.resourceId = ResourceLocation.parse(reference.resourceId()).withSuffix(codec.extensionAndDot());
+        this.resourceId = ResourceLocation.parse(reference.resourceId());
         this.referenceId = ResourceLocation.parse(reference.referenceId());
         this.ordinal = reference.ordinal();
         this.codec = codec;
@@ -59,8 +59,13 @@ public class BuiltResourceReference<T> implements ErrorMessageProvider {
     }
 
     @Override
-    public String getMessage() {
-        return String.format("Failed to capture json file '%s' for reference '%s'\n", resourceId, referenceId);
+    public String getRuntimeMessage(ResourceLocation resourceId) {
+        return String.format("Failed to capture %s file '%s' for reference '%s'\n", codec.extensionAndDot(), resourceId, referenceId);
+    }
+
+    @Override
+    public String getRegistrationMessage() {
+        return String.format("Failed to register reference '%s' for file '%s'\n", referenceId, resourceId);
     }
 
     @Override

@@ -1,4 +1,4 @@
-package net.ramixin.mixson;
+package net.ramixin.mixson.util;
 
 public record HexRecord<A,B,C,D,E,F>(A first, B second, C third, D fourth, E fifth, F sixth) {
 

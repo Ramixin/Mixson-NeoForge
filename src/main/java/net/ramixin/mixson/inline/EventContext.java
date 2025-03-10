@@ -1,10 +1,12 @@
 package net.ramixin.mixson.inline;
 
 import net.minecraft.resources.ResourceLocation;
-import net.ramixin.mixson.HexRecord;
 import net.ramixin.mixson.inline.entries.EventEntry;
+import net.ramixin.mixson.util.HexRecord;
+import net.ramixin.mixson.util.MixsonUtil;
 
 import java.util.*;
+import java.util.function.Function;
 
 @SuppressWarnings("unused")
 public class EventContext<T> {
@@ -18,8 +20,8 @@ public class EventContext<T> {
     private final Set<UUID> cancelledFutures = new HashSet<>();
     private final HashMap<ResourceLocation, T> identifiedCreatedResources = new HashMap<>();
     private final List<T> indexedCreatedResources = new ArrayList<>();
-    private final List<HexRecord<Integer, String, String, MixsonEvent<T>, Boolean, ResourceReference[]>> createdRuntimeEvents = new ArrayList<>();
-    private final List<HexRecord<Integer, String, String, MixsonEvent<T>, Boolean, ResourceReference[]>> createdEvents = new ArrayList<>();
+    private final List<HexRecord<Integer, Function<ResourceLocation, Boolean>, String, MixsonEvent<T>, Boolean, ResourceReference[]>> createdRuntimeEvents = new ArrayList<>();
+    private final List<HexRecord<Integer, Function<ResourceLocation, Boolean>, String, MixsonEvent<T>, Boolean, ResourceReference[]>> createdEvents = new ArrayList<>();
 
     public EventContext(ContextCreationType creationType, T file, ResourceLocation resourceId, EventEntry<T> entry, boolean markedForDeletion, BuiltResourceReference<T>[] references) {
         this.creationType = creationType;
@@ -81,18 +83,26 @@ public class EventContext<T> {
     }
 
     public void registerRuntimeEvent(int priority, String resourceId, String eventName, MixsonEvent<T> event, boolean failSilently, ResourceReference... references) {
-        createdRuntimeEvents.add(new HexRecord<>(priority, resourceId, eventName, event, failSilently, references));
+        registerRuntimeEvent(priority, MixsonUtil.getLocatorFromString(resourceId), eventName, event, failSilently, references);
     }
 
     public void registerDualEvent(int priority, String resourceId, String eventName, MixsonEvent<T> event, boolean failSilently, ResourceReference... references) {
-        createdEvents.add(new HexRecord<>(priority, resourceId, eventName, event, failSilently, references));
+        registerDualEvent(priority, MixsonUtil.getLocatorFromString(resourceId), eventName, event, failSilently, references);
     }
 
-    protected List<HexRecord<Integer, String, String, MixsonEvent<T>, Boolean, ResourceReference[]>> getCreatedRuntimeEvents() {
+    public void registerDualEvent(int priority, Function<ResourceLocation, Boolean> resourceLocator, String eventName, MixsonEvent<T> event, boolean failSilently, ResourceReference... references) {
+        createdEvents.add(new HexRecord<>(priority, resourceLocator, eventName, event, failSilently, references));
+    }
+
+    public void registerRuntimeEvent(int priority, Function<ResourceLocation, Boolean> resourceLocator, String eventName, MixsonEvent<T> event, boolean failSilently, ResourceReference... references) {
+        createdRuntimeEvents.add(new HexRecord<>(priority, resourceLocator, eventName, event, failSilently, references));
+    }
+
+    protected List<HexRecord<Integer, Function<ResourceLocation, Boolean>, String, MixsonEvent<T>, Boolean, ResourceReference[]>> getCreatedRuntimeEvents() {
         return createdRuntimeEvents;
     }
 
-    protected List<HexRecord<Integer, String, String, MixsonEvent<T>, Boolean, ResourceReference[]>> getCreatedEvents() {
+    protected List<HexRecord<Integer, Function<ResourceLocation, Boolean>, String, MixsonEvent<T>, Boolean, ResourceReference[]>> getCreatedEvents() {
         return createdEvents;
     }
 
