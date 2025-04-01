@@ -1,8 +1,6 @@
 package net.ramixin.mixson.inline;
 
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.mojang.datafixers.util.Pair;
@@ -35,6 +33,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -47,12 +46,11 @@ public final class Mixson {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("Mixson");
     private static DebugMode debugMode = DebugMode.OFF;
-    private static final Map<UUID, BuiltMixsonEvent<?>> events = Collections.synchronizedMap(new HashMap<>());
+    private static final Map<UUID, BuiltMixsonEvent<?>> events = Collections.synchronizedMap(new ConcurrentHashMap<>());
     private static final SortedMap<Integer, List<BuiltMixsonEvent<?>>> orderedEvents = Collections.synchronizedSortedMap(new TreeMap<>());
     private static final Map<UUID, CallCountEntry> callCounts = Collections.synchronizedMap(new HashMap<>());
-    private static final Map<UUID, BuiltResourceReference<?>> references = Collections.synchronizedMap(new HashMap<>());
+    private static final Map<UUID, BuiltResourceReference<?>> references = Collections.synchronizedMap(new ConcurrentHashMap<>());
     private static final SortedMap<Integer, List<BuiltResourceReference<?>>> orderedReferences = Collections.synchronizedSortedMap(new TreeMap<>());
-    private static final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     public static final int DEFAULT_PRIORITY = 1000;
     public static final MixsonCodec<JsonElement> JSON_ELEMENT_CODEC = MixsonCodec.create(
             "json",
