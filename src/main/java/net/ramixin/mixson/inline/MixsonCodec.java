@@ -13,7 +13,7 @@ public interface MixsonCodec<T> {
 
     T deserialize(Resource resource) throws IOException;
 
-    Resource serialize(Resource associatedResource, T file);
+    Resource serialize(Resource associatedResource, T file) throws IOException;
 
     ByteArrayOutputStream serializeOutputFile(T file) throws IOException;
 
@@ -40,7 +40,7 @@ public interface MixsonCodec<T> {
             }
 
             @Override
-            public Resource serialize(Resource associatedResource, T file) {
+            public Resource serialize(Resource associatedResource, T file) throws IOException {
                 return serializer.serialize(associatedResource, file);
             }
 

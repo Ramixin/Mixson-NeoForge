@@ -1,32 +1,26 @@
 package net.ramixin.mixson.util;
 
-import com.google.gson.JsonElement;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
+import net.neoforged.fml.ModList;
+import net.neoforged.fml.loading.moddiscovery.NightConfigWrapper;
+import net.neoforged.neoforgespi.language.IConfigurable;
+import net.ramixin.mixson.MixsonError;
+import net.ramixin.mixson.atp.MixsonAnnotationProcessor;
 import net.ramixin.mixson.inline.*;
 import net.ramixin.mixson.inline.entries.EventEntry;
 import org.apache.logging.log4j.util.TriConsumer;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 public interface MixsonUtil {
 
-    static ByteArrayOutputStream exportJson(JsonElement json) {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try {
-            baos.write(json.toString().getBytes());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return baos;
-    }
-
     static String identifierToPathString(String resourceId, String extension) {
         ResourceLocation usable = ResourceLocation.parse(resourceId);
-        return usable.getNamespace() + '~' + usable.getPath().replaceFirst("\\"+extension, "").replaceAll("/", "-");
+        return usable.getNamespace() + '~' + usable.getPath().replaceFirst(String.format("\\%s", extension), "").replaceAll("/", "-");
     }
 
     static String stringToUsablePath(String string) {
@@ -39,7 +33,7 @@ public interface MixsonUtil {
        return id;
     }
 
-    static Function<ResourceLocation, Boolean> getLocatorFromString(String resourceId) {
+    static ResourceLocator getLocatorFromString(String resourceId) {
         if(resourceId.endsWith("*")) {
             String id = removeWildcard(resourceId);
             return resourceLoc -> resourceLoc.toString().startsWith(id);
@@ -61,14 +55,14 @@ public interface MixsonUtil {
     }
 
     @SuppressWarnings("unchecked")
-    static <T> EventContext<T> createContext(ContextCreationType creationType, ResourceLocation resourceId, T file, EventEntry<T> entry, boolean markedForDeletion, Function<UUID, BuiltResourceReference<?>> referenceCallback) {
+    static <T> EventContext<T> createContext(ContextCreationType creationType, ResourceLocation resourceId, T file, EventEntry<T> entry, boolean markedForDeletion, Function<UUID, BuiltResourceReference<?>> referenceCallback, BiFunction<String, Integer, T> captureCallback) {
         BuiltMixsonEvent<T> event = entry.event();
         BuiltResourceReference<T>[] gatheredReferences = new BuiltResourceReference[event.referenceIds().length];
         for(int i = 0; i < event.referenceIds().length; i++) {
             BuiltResourceReference<T> ref = (BuiltResourceReference<T>) referenceCallback.apply(event.referenceIds()[i]);
             gatheredReferences[i] = ref;
         }
-        return new EventContext<>(creationType, file, resourceId, entry, markedForDeletion, gatheredReferences);
+        return new EventContext<>(creationType, file, resourceId, entry, markedForDeletion, gatheredReferences, captureCallback);
     }
 
     static <T> Optional<T> getFile(MixsonCodec<T> codec, Resource resource, ErrorMessageProvider messageProvider, ResourceLocation resourceId, TriConsumer<Exception, ErrorMessageProvider, ResourceLocation> errorCallback) {
@@ -78,6 +72,29 @@ public interface MixsonUtil {
             errorCallback.accept(e, messageProvider, resourceId);
         }
         return Optional.empty();
+    }
+
+    static void loadATPMixsonEntries(String path, Runnable locatedCallback) {
+        ModList.get().forEachModContainer((unused, modContainer) -> {
+            List<? extends IConfigurable> mixsonConfig = modContainer.getModInfo().getOwningFile().getConfig().getConfigList("mixson");
+            for(IConfigurable configurable : mixsonConfig) {
+                if(!(configurable instanceof NightConfigWrapper wrapper)) continue;
+                Optional<Object> maybeEntries = wrapper.getConfigElement(path);
+                if(maybeEntries.isEmpty()) continue;
+                String id = modContainer.getModId();
+                if(!(maybeEntries.get() instanceof List<?> list)) throw new IllegalStateException(String.format("'%s' field in [[mixson]] section must be a list of strings in mod '%s'", path, id));
+                if(!list.isEmpty())
+                    locatedCallback.run();
+                for(Object entry : list) {
+                    if(!(entry instanceof String className)) throw new IllegalStateException(String.format("'%s' field in [[mixson]] section must only contain strings, but found: '%s' in mod '%s'", path, entry, id));
+                    try {
+                        MixsonAnnotationProcessor.processClass(Class.forName(className));
+                    } catch (ClassNotFoundException e) {
+                        throw new MixsonError(String.format("class '%s' in 'mixson' field in mod '%s' does not exist", className, id));
+                    }
+                }
+            }
+        });
     }
 
 }

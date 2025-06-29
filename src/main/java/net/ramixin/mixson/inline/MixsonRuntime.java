@@ -40,10 +40,6 @@ public class MixsonRuntime {
     protected void insertEntry(AbstractEntry entry) {
         if(entry instanceof ReferenceEntry<?> referenceEntry) runtimeReferences.put(referenceEntry.reference().getUuid(), referenceEntry.reference());
         int priority = entry.priority();
-        if(!queuedEvents.isEmpty()) {
-            AbstractEntry next = queuedEvents.getFirst();
-            if(next.priority() > priority) return;
-        }
         for (int i = 0; i < queuedEvents.size(); i++) {
             AbstractEntry abstractEntry = queuedEvents.get(i);
             if(abstractEntry.priority() <= priority) continue;

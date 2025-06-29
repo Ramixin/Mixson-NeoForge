@@ -3,14 +3,14 @@ package net.ramixin.mixson.inline;
 import net.minecraft.resources.ResourceLocation;
 import net.ramixin.mixson.util.ErrorMessageProvider;
 import net.ramixin.mixson.util.MixsonUtil;
+import net.ramixin.mixson.util.ResourceLocator;
 
 import java.util.UUID;
-import java.util.function.Function;
 
-public record BuiltMixsonEvent<T>(MixsonCodec<T> codec, UUID uuid, Function<ResourceLocation, Boolean> resourceLocator, String eventName, MixsonEvent<T> event, boolean silentlyFail, UUID... referenceIds) implements ErrorMessageProvider {
+public record BuiltMixsonEvent<T>(MixsonCodec<T> codec, UUID uuid, ResourceLocator resourceLocator, String eventName, MixsonEvent<T> event, boolean silentlyFail, boolean assertive, UUID... referenceIds) implements ErrorMessageProvider {
 
-    public BuiltMixsonEvent(MixsonCodec<T> codec, Function<ResourceLocation, Boolean> resourceLocator, String eventId, MixsonEvent<T> event, boolean silentlyFail, UUID... referenceIds) {
-        this(codec, UUID.randomUUID(), resourceLocator, eventId, event, silentlyFail, referenceIds);
+    public BuiltMixsonEvent(MixsonCodec<T> codec, ResourceLocator resourceLocator, String eventId, MixsonEvent<T> event, boolean silentlyFail, boolean assertive, UUID... referenceIds) {
+        this(codec, UUID.randomUUID(), resourceLocator, eventId, event, silentlyFail, assertive, referenceIds);
     }
 
     public boolean isApplicable(ResourceLocation resourceId) {

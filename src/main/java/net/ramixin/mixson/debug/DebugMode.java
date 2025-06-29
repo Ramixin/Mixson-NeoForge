@@ -4,6 +4,7 @@ public enum DebugMode {
 
     OFF,
     LOG,
+    VERBOSE,
     EXPORT
 
 }

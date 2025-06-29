@@ -20,7 +20,7 @@ public interface EventProcessors {
 
     static MixsonCodec<?> getCodec(String codec, String eventName) {
         MixsonCodec<?> mixsonCodec;
-        if(codec.isEmpty()) mixsonCodec = Mixson.JSON_ELEMENT_CODEC;
+        if(codec.isEmpty()) mixsonCodec = MixsonCodecs.JSON_ELEMENT;
         else mixsonCodec = EventPreprocessors.getCodec(codec);
         if(mixsonCodec == null) throw new MixsonError("unknown codec identifier '%s' for event '%s'", codec, eventName);
         return mixsonCodec;
@@ -60,18 +60,17 @@ public interface EventProcessors {
         }
         ResourceLocation[] referenceIds = referenceIdsList.toArray(ResourceLocation[]::new);
         ResourceReference[] references = referencesList.toArray(ResourceReference[]::new);
-        for(String resourceId : event.resourceIds()) {
-            Mixson.registerEvent(
-                    event.codec(),
-                    event.priority(),
-                    resourceId,
-                    event.eventName(),
-                    (context) -> runEventIntermediate(method, context, referenceIds, logger),
-                    event.failSilently(),
-                    references
-            );
-        }
-
+        List<ResourceLocation> resourceLocations = new ArrayList<>();
+        for(String resourceId : event.resourceIds()) resourceLocations.add(ResourceLocation.parse(resourceId));
+        Mixson.registerEvent(
+                event.codec(),
+                event.priority(),
+                resourceLocations::contains,
+                event.eventName(),
+                (context) -> runEventIntermediate(method, context, referenceIds, logger),
+                event.failSilently(),
+                references
+        );
     }
 
     private static Parameter[] getAndValidateParameters(Method method) {

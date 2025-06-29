@@ -1,12 +1,15 @@
 package net.ramixin.mixson.inline;
 
 import net.minecraft.resources.ResourceLocation;
+import net.ramixin.mixson.MixsonError;
 import net.ramixin.mixson.inline.entries.EventEntry;
-import net.ramixin.mixson.util.HexRecord;
 import net.ramixin.mixson.util.MixsonUtil;
+import net.ramixin.mixson.util.ResourceLocator;
+import org.apache.commons.lang3.mutable.Mutable;
+import org.apache.commons.lang3.mutable.MutableObject;
 
 import java.util.*;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 
 @SuppressWarnings("unused")
 public class EventContext<T> {
@@ -20,15 +23,19 @@ public class EventContext<T> {
     private final Set<UUID> cancelledFutures = new HashSet<>();
     private final HashMap<ResourceLocation, T> identifiedCreatedResources = new HashMap<>();
     private final List<T> indexedCreatedResources = new ArrayList<>();
-    private final List<HexRecord<Integer, Function<ResourceLocation, Boolean>, String, MixsonEvent<T>, Boolean, ResourceReference[]>> createdRuntimeEvents = new ArrayList<>();
-    private final List<HexRecord<Integer, Function<ResourceLocation, Boolean>, String, MixsonEvent<T>, Boolean, ResourceReference[]>> createdEvents = new ArrayList<>();
+    private final HashMap<MixsonEventBuilder<T>, Integer> createdRuntimeEvents = new HashMap<>();
+    private final HashMap<MixsonEventBuilder<T>, Integer> createdEvents = new HashMap<>();
+    private final Mutable<T> debugExportObject;
+    private final BiFunction<String, Integer, T> captureCallback;
 
-    public EventContext(ContextCreationType creationType, T file, ResourceLocation resourceId, EventEntry<T> entry, boolean markedForDeletion, BuiltResourceReference<T>[] references) {
+    public EventContext(ContextCreationType creationType, T file, ResourceLocation resourceId, EventEntry<T> entry, boolean markedForDeletion, BuiltResourceReference<T>[] references, BiFunction<String, Integer, T> captureCallback) {
         this.creationType = creationType;
         this.file = file;
+        this.debugExportObject = new MutableObject<>(this.file);
         this.resourceId = resourceId;
         this.entry = entry;
         this.markedForDeletion = markedForDeletion;
+        this.captureCallback = captureCallback;
         for(BuiltResourceReference<T> ref : references) this.references.put(ref.getReferenceId(), ref);
     }
 
@@ -82,27 +89,87 @@ public class EventContext<T> {
         this.cancelledFutures.add(uuid);
     }
 
+    /**
+     * Use {@link #registerRuntimeEvent(int, ResourceLocator, String, MixsonEvent, boolean, ResourceReference...)}
+     * to register runtime events.
+     * **/
+    @Deprecated
     public void registerRuntimeEvent(int priority, String resourceId, String eventName, MixsonEvent<T> event, boolean failSilently, ResourceReference... references) {
         registerRuntimeEvent(priority, MixsonUtil.getLocatorFromString(resourceId), eventName, event, failSilently, references);
     }
 
+    /**
+     * Use {@link #registerDualEvent(int, ResourceLocator, String, MixsonEvent, boolean, ResourceReference...)}
+     * to register dual events.
+     * **/
+    @Deprecated
     public void registerDualEvent(int priority, String resourceId, String eventName, MixsonEvent<T> event, boolean failSilently, ResourceReference... references) {
         registerDualEvent(priority, MixsonUtil.getLocatorFromString(resourceId), eventName, event, failSilently, references);
     }
 
-    public void registerDualEvent(int priority, Function<ResourceLocation, Boolean> resourceLocator, String eventName, MixsonEvent<T> event, boolean failSilently, ResourceReference... references) {
-        createdEvents.add(new HexRecord<>(priority, resourceLocator, eventName, event, failSilently, references));
+    public void registerDualEvent(int priority, ResourceLocator resourceLocator, String eventName, MixsonEvent<T> event, boolean failSilently, ResourceReference... references) {
+        MixsonEventBuilder<T> eventBuilder = new MixsonEventBuilder<T>()
+                .setCodec(this.getEvent().codec())
+                .setResourceLocator(resourceLocator)
+                .setEventName(eventName)
+                .setEvent(event)
+                .setSilentlyFail(failSilently)
+                .setReferences(references);
+        createdEvents.put(eventBuilder, priority);
     }
 
-    public void registerRuntimeEvent(int priority, Function<ResourceLocation, Boolean> resourceLocator, String eventName, MixsonEvent<T> event, boolean failSilently, ResourceReference... references) {
-        createdRuntimeEvents.add(new HexRecord<>(priority, resourceLocator, eventName, event, failSilently, references));
+    public void registerRuntimeEvent(int priority, ResourceLocator resourceLocator, String eventName, MixsonEvent<T> event, boolean failSilently, boolean assertive, ResourceReference... references) {
+        MixsonEventBuilder<T> eventBuilder = new MixsonEventBuilder<T>()
+                .setCodec(this.getEvent().codec())
+                .setResourceLocator(resourceLocator)
+                .setEventName(eventName)
+                .setEvent(event)
+                .setSilentlyFail(failSilently)
+                .setReferences(references)
+                .setAssertive(assertive);
+        createdRuntimeEvents.put(eventBuilder, priority);
     }
 
-    protected List<HexRecord<Integer, Function<ResourceLocation, Boolean>, String, MixsonEvent<T>, Boolean, ResourceReference[]>> getCreatedRuntimeEvents() {
+    public void registerRuntimeEvent(int priority, ResourceLocator resourceLocator, String eventName, MixsonEvent<T> event, boolean failSilently, ResourceReference... references) {
+        registerRuntimeEvent(priority, resourceLocator, eventName, event, failSilently, false, references);
+    }
+
+    public void registerRuntimeEvent(int priority, MixsonEventBuilder<T> eventBuilder) {
+        if(eventBuilder.hasDifferentCodec(this.getEvent().codec()))
+            throw new MixsonError("attempted to register runtime event with different codec than the event");
+        createdRuntimeEvents.put(eventBuilder, priority);
+    }
+
+    public void registerEvent(int priority, MixsonEventBuilder<T> eventBuilder) {
+        if(eventBuilder.hasDifferentCodec(this.getEvent().codec()))
+            throw new MixsonError("attempted to register event with different codec than the event");
+        createdEvents.put(eventBuilder, priority);
+    }
+
+    public Optional<T> captureFile(String resourceId) {
+        return captureFile(resourceId, 0);
+    }
+    public Optional<T> captureFile(String resourceId, int ordinal) {
+        return Optional.ofNullable(captureCallback.apply(resourceId, ordinal));
+    }
+
+    public void setDebugExport(T result) {
+        this.debugExportObject.setValue(result);
+    }
+
+    public void cancelDebugExport() {
+        this.debugExportObject.setValue(null);
+    }
+
+    protected T getDebugExportObject() {
+        return this.debugExportObject.getValue();
+    }
+
+    protected HashMap<MixsonEventBuilder<T>, Integer> getCreatedRuntimeEvents() {
         return createdRuntimeEvents;
     }
 
-    protected List<HexRecord<Integer, Function<ResourceLocation, Boolean>, String, MixsonEvent<T>, Boolean, ResourceReference[]>> getCreatedEvents() {
+    protected HashMap<MixsonEventBuilder<T>, Integer> getCreatedEvents() {
         return createdEvents;
     }
 
