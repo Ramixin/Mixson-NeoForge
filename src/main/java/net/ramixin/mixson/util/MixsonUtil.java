@@ -1,6 +1,6 @@
 package net.ramixin.mixson.util;
 
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.Resource;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.moddiscovery.NightConfigWrapper;
@@ -19,7 +19,7 @@ import java.util.function.Function;
 public interface MixsonUtil {
 
     static String identifierToPathString(String resourceId, String extension) {
-        ResourceLocation usable = ResourceLocation.parse(resourceId);
+        Identifier usable = Identifier.parse(resourceId);
         return usable.getNamespace() + '~' + usable.getPath().replaceFirst(String.format("\\%s", extension), "").replaceAll("/", "-");
     }
 
@@ -27,9 +27,9 @@ public interface MixsonUtil {
         return string.replaceAll("[*|/\\\\:?<>\"]", "");
     }
 
-    static ResourceLocation removeExtension(ResourceLocation id) {
+    static Identifier removeExtension(Identifier id) {
         String stringId = id.getPath();
-        for(int i = stringId.length()-1; i > 0; i--) if(stringId.charAt(i) == '.') return ResourceLocation.fromNamespaceAndPath(id.getNamespace(), stringId.substring(0, i));
+        for(int i = stringId.length()-1; i > 0; i--) if(stringId.charAt(i) == '.') return Identifier.fromNamespaceAndPath(id.getNamespace(), stringId.substring(0, i));
        return id;
     }
 
@@ -38,7 +38,7 @@ public interface MixsonUtil {
             String id = removeWildcard(resourceId);
             return resourceLoc -> resourceLoc.toString().startsWith(id);
         }
-        else return resourceLoc -> resourceLoc.equals(ResourceLocation.parse(resourceId));
+        else return resourceLoc -> resourceLoc.equals(Identifier.parse(resourceId));
     }
 
     static <T> void addComponent(T component, int priority, UUID uuid, Map<UUID, T> components, SortedMap<Integer, List<T>> orderedComponents) {
@@ -55,7 +55,7 @@ public interface MixsonUtil {
     }
 
     @SuppressWarnings("unchecked")
-    static <T> EventContext<T> createContext(ContextCreationType creationType, ResourceLocation resourceId, T file, EventEntry<T> entry, boolean markedForDeletion, Function<UUID, BuiltResourceReference<?>> referenceCallback, BiFunction<String, Integer, T> captureCallback) {
+    static <T> EventContext<T> createContext(ContextCreationType creationType, Identifier resourceId, T file, EventEntry<T> entry, boolean markedForDeletion, Function<UUID, BuiltResourceReference<?>> referenceCallback, BiFunction<String, Integer, T> captureCallback) {
         BuiltMixsonEvent<T> event = entry.event();
         BuiltResourceReference<T>[] gatheredReferences = new BuiltResourceReference[event.referenceIds().length];
         for(int i = 0; i < event.referenceIds().length; i++) {
@@ -65,7 +65,7 @@ public interface MixsonUtil {
         return new EventContext<>(creationType, file, resourceId, entry, markedForDeletion, gatheredReferences, captureCallback);
     }
 
-    static <T> Optional<T> getFile(MixsonCodec<T> codec, Resource resource, ErrorMessageProvider messageProvider, ResourceLocation resourceId, TriConsumer<Exception, ErrorMessageProvider, ResourceLocation> errorCallback) {
+    static <T> Optional<T> getFile(MixsonCodec<T> codec, Resource resource, ErrorMessageProvider messageProvider, Identifier resourceId, TriConsumer<Exception, ErrorMessageProvider, Identifier> errorCallback) {
         try {
             return Optional.of(codec.deserialize(resource));
         } catch (IOException e) {

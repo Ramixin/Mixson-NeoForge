@@ -1,6 +1,6 @@
 package net.ramixin.mixson.inline;
 
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.ramixin.mixson.util.ErrorMessageProvider;
 
 import java.util.Optional;
@@ -10,9 +10,9 @@ public class BuiltResourceReference<T> implements ErrorMessageProvider {
 
     private T resource;
 
-    private final ResourceLocation referenceId;
+    private final Identifier referenceId;
 
-    private final ResourceLocation resourceId;
+    private final Identifier resourceId;
 
     private final int ordinal;
 
@@ -23,8 +23,8 @@ public class BuiltResourceReference<T> implements ErrorMessageProvider {
     protected BuiltResourceReference(ResourceReference reference, MixsonCodec<T> codec) {
         if(reference.ordinal() == -1) throw new IllegalArgumentException(String.format("Ordinal for resource reference: %s cannot be -1", reference.referenceId()));
         if(reference.ordinal() < 0) throw new IllegalArgumentException(String.format("Ordinal for resource reference: %s cannot be negative", reference.referenceId()));
-        this.resourceId = ResourceLocation.parse(reference.resourceId());
-        this.referenceId = ResourceLocation.parse(reference.referenceId());
+        this.resourceId = Identifier.parse(reference.resourceId());
+        this.referenceId = Identifier.parse(reference.referenceId());
         this.ordinal = reference.ordinal();
         this.codec = codec;
     }
@@ -38,11 +38,11 @@ public class BuiltResourceReference<T> implements ErrorMessageProvider {
         this.resource = elem;
     }
 
-    public ResourceLocation getReferenceId() {
+    public Identifier getReferenceId() {
         return referenceId;
     }
 
-    public ResourceLocation getResourceId() {
+    public Identifier getResourceId() {
         return resourceId;
     }
 
@@ -59,7 +59,7 @@ public class BuiltResourceReference<T> implements ErrorMessageProvider {
     }
 
     @Override
-    public String getRuntimeMessage(ResourceLocation resourceId) {
+    public String getRuntimeMessage(Identifier resourceId) {
         return String.format("Failed to capture %s file '%s' for reference '%s'\n", codec.extensionAndDot(), resourceId, referenceId);
     }
 

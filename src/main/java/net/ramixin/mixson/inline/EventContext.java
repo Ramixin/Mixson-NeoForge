@@ -1,6 +1,6 @@
 package net.ramixin.mixson.inline;
 
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.ramixin.mixson.MixsonError;
 import net.ramixin.mixson.inline.entries.EventEntry;
 import net.ramixin.mixson.util.MixsonUtil;
@@ -16,19 +16,19 @@ public class EventContext<T> {
 
     private final ContextCreationType creationType;
     private final T file;
-    private final ResourceLocation resourceId;
+    private final Identifier resourceId;
     private final EventEntry<T> entry;
-    private final HashMap<ResourceLocation, BuiltResourceReference<T>> references = new HashMap<>();
+    private final HashMap<Identifier, BuiltResourceReference<T>> references = new HashMap<>();
     private boolean markedForDeletion;
     private final Set<UUID> cancelledFutures = new HashSet<>();
-    private final HashMap<ResourceLocation, T> identifiedCreatedResources = new HashMap<>();
+    private final HashMap<Identifier, T> identifiedCreatedResources = new HashMap<>();
     private final List<T> indexedCreatedResources = new ArrayList<>();
     private final HashMap<MixsonEventBuilder<T>, Integer> createdRuntimeEvents = new HashMap<>();
     private final HashMap<MixsonEventBuilder<T>, Integer> createdEvents = new HashMap<>();
     private final Mutable<T> debugExportObject;
     private final BiFunction<String, Integer, T> captureCallback;
 
-    public EventContext(ContextCreationType creationType, T file, ResourceLocation resourceId, EventEntry<T> entry, boolean markedForDeletion, BuiltResourceReference<T>[] references, BiFunction<String, Integer, T> captureCallback) {
+    public EventContext(ContextCreationType creationType, T file, Identifier resourceId, EventEntry<T> entry, boolean markedForDeletion, BuiltResourceReference<T>[] references, BiFunction<String, Integer, T> captureCallback) {
         this.creationType = creationType;
         this.file = file;
         this.debugExportObject = new MutableObject<>(this.file);
@@ -43,7 +43,7 @@ public class EventContext<T> {
         return this.file;
     }
 
-    public ResourceLocation getResourceId() {
+    public Identifier getResourceId() {
         return this.resourceId;
     }
 
@@ -60,14 +60,14 @@ public class EventContext<T> {
     }
 
     public BuiltResourceReference<T> getReference(String id) {
-        return this.references.get(ResourceLocation.parse(id));
+        return this.references.get(Identifier.parse(id));
     }
 
     public void markForDeletion(boolean shouldDelete) {
         this.markedForDeletion = shouldDelete;
     }
 
-    public void createResource(ResourceLocation id, T elem) {
+    public void createResource(Identifier id, T elem) {
         if(creationType != ContextCreationType.IDENTIFIED) throw new IllegalCallerException(String.format("cannot created identified resources for event '%s'", getEventName()));
         this.identifiedCreatedResources.put(id, elem);
     }
@@ -77,7 +77,7 @@ public class EventContext<T> {
         this.indexedCreatedResources.add(elem);
     }
 
-    protected HashMap<ResourceLocation, T> getIdentifiedCreatedResources() {
+    protected HashMap<Identifier, T> getIdentifiedCreatedResources() {
         return this.identifiedCreatedResources;
     }
 
@@ -162,7 +162,7 @@ public class EventContext<T> {
     }
 
     protected T getDebugExportObject() {
-        return this.debugExportObject.getValue();
+        return this.debugExportObject.get();
     }
 
     protected HashMap<MixsonEventBuilder<T>, Integer> getCreatedRuntimeEvents() {

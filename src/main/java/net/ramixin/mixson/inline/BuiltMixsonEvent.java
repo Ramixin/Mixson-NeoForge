@@ -1,6 +1,6 @@
 package net.ramixin.mixson.inline;
 
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.ramixin.mixson.util.ErrorMessageProvider;
 import net.ramixin.mixson.util.MixsonUtil;
 import net.ramixin.mixson.util.ResourceLocator;
@@ -13,13 +13,13 @@ public record BuiltMixsonEvent<T>(MixsonCodec<T> codec, UUID uuid, ResourceLocat
         this(codec, UUID.randomUUID(), resourceLocator, eventId, event, silentlyFail, assertive, referenceIds);
     }
 
-    public boolean isApplicable(ResourceLocation resourceId) {
+    public boolean isApplicable(Identifier resourceId) {
         if(!resourceId.getPath().endsWith(codec().extensionAndDot())) return false;
         return resourceLocator.apply(MixsonUtil.removeExtension(resourceId));
     }
 
     @Override
-    public String getRuntimeMessage(ResourceLocation resourceId) {
+    public String getRuntimeMessage(Identifier resourceId) {
         return String.format("Failed to interact with %s file '%s' with event '%s'\n", codec.extensionAndDot(), resourceId, eventName);
     }
 

@@ -1,6 +1,6 @@
 package net.ramixin.mixson.atp.processors;
 
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.ramixin.mixson.MixsonError;
 import net.ramixin.mixson.atp.BuiltAnnotationEvent;
 import net.ramixin.mixson.atp.annotations.Reference;
@@ -46,7 +46,7 @@ public interface EventProcessors {
         logger.info("Expanding method '{}' in class '{}' with eventName '{}' in class '{}",  methodName, method.getName(), event.eventName(), method.getDeclaringClass().getName());
         Parameter[] parameters = getAndValidateParameters(method);
         List<ResourceReference> referencesList = new ArrayList<>();
-        List<ResourceLocation> referenceIdsList = new ArrayList<>();
+        List<Identifier> referenceIdsList = new ArrayList<>();
         for(int i = 1; i < parameters.length; i++) {
             Parameter parameter = parameters[i];
             Reference reference = parameter.getAnnotation(Reference.class);
@@ -55,17 +55,17 @@ public interface EventProcessors {
             String name;
             if (reference.referenceId().isEmpty()) name = BuiltAnnotationEvent.generateEventName(parameter.getName());
             else name = reference.referenceId();
-            referenceIdsList.add(ResourceLocation.parse(name));
+            referenceIdsList.add(Identifier.parse(name));
             referencesList.add(new ResourceReference(reference.priority(), reference.value(), name));
         }
-        ResourceLocation[] referenceIds = referenceIdsList.toArray(ResourceLocation[]::new);
+        Identifier[] referenceIds = referenceIdsList.toArray(Identifier[]::new);
         ResourceReference[] references = referencesList.toArray(ResourceReference[]::new);
-        List<ResourceLocation> resourceLocations = new ArrayList<>();
-        for(String resourceId : event.resourceIds()) resourceLocations.add(ResourceLocation.parse(resourceId));
+        List<Identifier> Identifiers = new ArrayList<>();
+        for(String resourceId : event.resourceIds()) Identifiers.add(Identifier.parse(resourceId));
         Mixson.registerEvent(
                 event.codec(),
                 event.priority(),
-                resourceLocations::contains,
+                Identifiers::contains,
                 event.eventName(),
                 (context) -> runEventIntermediate(method, context, referenceIds, logger),
                 event.failSilently(),
@@ -85,7 +85,7 @@ public interface EventProcessors {
         return parameters;
     }
 
-    private static <T> Object[] buildParameters(EventContext<T> context, ResourceLocation[] referenceIds) {
+    private static <T> Object[] buildParameters(EventContext<T> context, Identifier[] referenceIds) {
         Object[] parameters = new Object[referenceIds.length + 1];
         parameters[0] = context;
         for(int i = 0; i < referenceIds.length; i++) {
@@ -94,7 +94,7 @@ public interface EventProcessors {
         return parameters;
     }
 
-    private static <T> void runEventIntermediate(Method method, EventContext<T> context, ResourceLocation[] referenceIds, Logger logger) {
+    private static <T> void runEventIntermediate(Method method, EventContext<T> context, Identifier[] referenceIds, Logger logger) {
         try {
             method.setAccessible(true);
             method.invoke(null, buildParameters(context, referenceIds));
