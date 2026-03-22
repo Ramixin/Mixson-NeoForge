@@ -6,9 +6,8 @@
   "refmap": "mixson.refmap.json",
   "mixins": [
     "NamespaceResourceManagerMixin",
-    "ResourceManagerImplMixinArray"
-  ],
-  "client": [
+    "ResourceManagerImplMixinArray",
+    "ResourceManagerRegistryLoadTaskMixin"
   ],
   "injectors": {
     "defaultRequire": 1
