@@ -24,12 +24,12 @@ public class EventContext<T> {
     private final Set<UUID> cancelledFutures = new HashSet<>();
     private final List<UUID> pulledFutures = new ArrayList<>();
     private final HashMap<Index, T> createdResources = new HashMap<>();
-    private final Mutable<T> debugExportObject;
+    private final Mutable<Optional<T>> debugExportObject;
     private final HashMap<Index, List<Mutable<T>>> capturedFiles = new HashMap<>();
 
     protected EventContext(T file, Index index, EventEntry<T> entry, MixsonRuntime<?> runtime, Map.Entry<Index, Resource> resourceEntry, boolean markedForDeletion) {
         this.file = new MutableObject<>(file);
-        this.debugExportObject = new MutableObject<>(file);
+        this.debugExportObject = new MutableObject<>(Optional.empty());
         this.index = index;
         this.entry = entry;
         this.markedForDeletion = markedForDeletion;
@@ -90,23 +90,30 @@ public class EventContext<T> {
         if(maybeResourceList.isEmpty()) return List.of();
         List<Resource> resourceList = maybeResourceList.get();
         List<Mutable<T>> resultList = new ArrayList<>();
+        List<Mutable<T>> keepingList = new ArrayList<>();
         for(Resource r : resourceList) {
             T deserializedFile = deserializeFile(this.getEvent().codec(), r, error -> runtime.error(error, getEvent(), resourceEntry.getKey().id())).orElse(null);
             resultList.add(new MutableObject<>(deserializedFile));
+            if(deserializedFile != null) keepingList.add(new MutableObject<>(deserializedFile));
         }
-        capturedFiles.put(id, List.copyOf(resultList));
+        capturedFiles.put(id, keepingList);
         return resultList;
     }
 
     public void setDebugExport(T result) {
-        this.debugExportObject.setValue(result);
+        this.debugExportObject.setValue(Optional.of(result));
     }
 
     public void cancelDebugExport() {
         this.debugExportObject.setValue(null);
     }
 
-    protected T getDebugExport() {
+    protected Optional<T> getDebugExport() {
+        //noinspection OptionalAssignedToNull
+        if(this.debugExportObject.get() == null)
+            return Optional.empty();
+        if(this.debugExportObject.get().isEmpty())
+            return Optional.of(file.get());
         return this.debugExportObject.get();
     }
 

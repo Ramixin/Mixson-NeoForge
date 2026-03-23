@@ -178,9 +178,9 @@ public final class Mixson {
         long fileStartTime = System.nanoTime();
         event.event().runEvent(context);
         logExtra("Finished running '{}' on resource '{}' in {}", event.eventName(), resourceEntry.getKey().id(), timestamp(fileStartTime));
-        T debugExport = context.getDebugExport();
-        if(debugExport != null && getDebugFlag(DebugOption.EXPORT_PATCHED_FILE))
-            exportDebugFile(event.codec(), debugExport, event.eventName(), resourceEntry.getKey().id().toString(), event.codec().extensionAndDot(), true);
+        Optional<T> debugExport = context.getDebugExport();
+        if(debugExport.isPresent() && getDebugFlag(DebugOption.EXPORT_PATCHED_FILE))
+            exportDebugFile(event.codec(), debugExport.get(), event.eventName(), resourceEntry.getKey().id().toString(), event.codec().extensionAndDot(), true);
         if(context.isMarkedForDeletion()) markedForDeletion.add(resourceEntry.getKey());
         else markedForDeletion.remove(resourceEntry.getKey());
         for(UUID cancelledFuture : context.getCancelledFutures())
