@@ -24,8 +24,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Predicate;
 
 import static net.ramixin.mixson.util.MixsonUtil.*;
@@ -35,11 +35,10 @@ public final class Mixson {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("Mixson");
     private static int debugOptionFlags = 0;
-    private static final Map<UUID, MixsonEvent<?>> events = new ConcurrentHashMap<>();
-    private static final SortedMap<Integer, List<MixsonEvent<?>>> orderedEvents = new ConcurrentSkipListMap<>();
-    private static final Map<UUID, ResourceReference<?>> references = new ConcurrentHashMap<>();
-    private static final SortedMap<Integer, List<ResourceReference<?>>> orderedReferences = new ConcurrentSkipListMap<>();
-    private static final Map<UUID, MixsonEvent<?>> deferredEvents = new ConcurrentHashMap<>();
+    private static final MixsonRegistry<MixsonEvent<?>> eventRegistry = new MixsonRegistry<>(MixsonEvent::uuid, MixsonEvent::priority);
+    private static final MixsonRegistry<ResourceReference<?>> referenceRegistry = new MixsonRegistry<>(ResourceReference::getUuid, ResourceReference::getPriority);
+
+    private static final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     public static final int DEFAULT_PRIORITY = 1000;
 
@@ -67,11 +66,10 @@ public final class Mixson {
 
     public static <T> UUID registerEvent(MixsonEventBuilder<T> builder) {
         MixsonEvent<T> builtEvent = builder.build();
-        if(builtEvent.lifetime() == Lifetime.DEFERRED) {
-            deferredEvents.put(builtEvent.uuid(), builtEvent);
-            return builtEvent.uuid();
-        }
-        return finalizeEventRegistration(builtEvent);
+        if(builtEvent.lifetime() == Lifetime.DEFERRED)
+            return eventRegistry.registerDeferred(builtEvent);
+        else
+            return eventRegistry.register(builtEvent);
     }
 
     public static ResourceReference<JsonElement> registerReference(int priority, Index index, String referenceName) {
@@ -89,21 +87,15 @@ public final class Mixson {
 
     public static <T> ResourceReference<T> registerReference(ResourceReferenceBuilder<T> builder) {
         ResourceReference<T> ref = builder.build();
-        addComponent(ref, ref.getPriority(), ref.getUuid(), references, orderedReferences);
+        referenceRegistry.register(ref);
         return ref;
-    }
-
-    // SEPARATED REGISTRATION
-
-    private static <T> UUID finalizeEventRegistration(MixsonEvent<T> builtEvent) {
-        addComponent(builtEvent, builtEvent.priority(), builtEvent.uuid(), events, orderedEvents);
-        return builtEvent.uuid();
     }
 
     // EXTERNAL RUN METHODS
 
     public static <T> T processHook(AbstractHook<T> hook) {
-        MixsonRuntime<T> runtime = new MixsonRuntime<>(hook, orderedEvents, orderedReferences, LOGGER::error);
+        lock.readLock().lock();
+        MixsonRuntime<T> runtime = new MixsonRuntime<>(hook, eventRegistry, referenceRegistry, LOGGER::error);
         while(runtime.isRunning()) {
             AbstractEntry entry = runtime.pop();
             switch(entry) {
@@ -114,6 +106,7 @@ public final class Mixson {
                 default -> throw new IllegalStateException("Unexpected value: " + entry);
             }
         }
+        lock.readLock().unlock();
         return hook.getAttachedResources();
     }
 
@@ -146,7 +139,7 @@ public final class Mixson {
         if(entries.isEmpty() && eventEntry.event().assertive()) throw new MixsonException("assertion on event '%s' failed", event.eventName());
         if(entries.isEmpty()) return;
         if(event.lifetime() == Lifetime.ONCE)
-            remove(event.uuid());
+            removeEvent(event.uuid());
         entries.sort(Comparator
                 .comparing((Map.Entry<Index, Resource> o) -> o.getKey().id())
                 .thenComparingInt(o -> o.getKey().ordinal())
@@ -187,19 +180,19 @@ public final class Mixson {
             runtime.cancelEvent(cancelledFuture);
         context.cleanupCapturedFiles();
         for(UUID uuid : context.getPulledFutures()) {
-            MixsonEvent<?> pulledDeferred = deferredEvents.remove(uuid);
-            if(pulledDeferred != null) {
-                runtime.insertEntry(new EventEntry<>(pulledDeferred.priority(), pulledDeferred));
+            Optional<MixsonEvent<?>> pulledDeferred = eventRegistry.pullDeferred(uuid);
+            if(pulledDeferred.isPresent()) {
+                runtime.insertEntry(new EventEntry<>(pulledDeferred.get().priority(), pulledDeferred.get()));
                 continue;
             }
-            MixsonEvent<?> pulledEvent = events.get(uuid);
-            if(pulledEvent != null) {
-                runtime.insertEntry(new EventEntry<>(pulledEvent.priority(), pulledEvent));
+            Optional<MixsonEvent<?>> pulledEvent = eventRegistry.get(uuid);
+            if(pulledEvent.isPresent()) {
+                runtime.insertEntry(new EventEntry<>(pulledEvent.get().priority(), pulledEvent.get()));
                 continue;
             }
-            ResourceReference<?> pulledRef = references.get(uuid);
-            if(pulledRef != null) {
-                runtime.insertEntry(new ReferenceEntry<>(pulledRef.getPriority(), pulledRef));
+            Optional<ResourceReference<?>> pulledRef = referenceRegistry.get(uuid);
+            if(pulledRef.isPresent()) {
+                runtime.insertEntry(new ReferenceEntry<>(pulledRef.get().getPriority(), pulledRef.get()));
                 continue;
             }
             throw new IllegalArgumentException("failed to locate event or reference with uuid of "+uuid);
@@ -219,20 +212,42 @@ public final class Mixson {
 
     // MISC. PUBLICS
 
+    /** @Deprecated Use {@link #removeEvent(UUID)} or {@link #removeReference(UUID)} instead**/
+    @Deprecated
     public static boolean remove(UUID uuid) {
-        for(List<MixsonEvent<?>> eventSet : orderedEvents.values()) eventSet.removeIf(event -> event.uuid().equals(uuid));
-        if(events.remove(uuid) != null) return true;
-        for(List<ResourceReference<?>> referenceSet : orderedReferences.values()) referenceSet.removeIf(event -> event.getUuid().equals(uuid));
-        return references.remove(uuid) != null;
+        return removeEvent(uuid) || removeReference(uuid);
     }
 
+    public static boolean removeEvent(UUID uuid) {
+        return eventRegistry.unregister(uuid);
+    }
+
+    public static boolean removeReference(UUID uuid) {
+        return referenceRegistry.unregister(uuid);
+    }
+
+    /** @Deprecated Use {@link #hasEvent(UUID)} or {@link #hasReference(UUID)} instead**/
+    @Deprecated
     public static boolean has(UUID uuid) {
-        if(events.containsKey(uuid)) return true;
-        return references.containsKey(uuid);
+        return hasEvent(uuid) || hasReference(uuid);
+    }
+
+    public static boolean hasEvent(UUID uuid) {
+        return eventRegistry.contains(uuid);
+    }
+
+    public static boolean hasReference(UUID uuid) {
+        return referenceRegistry.contains(uuid);
     }
 
     public static String getEventName(UUID uuid) {
-        return events.get(uuid).eventName();
+        MixsonEvent<?> event = eventRegistry.get(uuid).orElseThrow();
+        return event.eventName();
+    }
+
+    public static Runnable lockEventProcessing() {
+        lock.writeLock().lock();
+        return () -> lock.writeLock().unlock();
     }
 
     // DEBUGGING STUFF

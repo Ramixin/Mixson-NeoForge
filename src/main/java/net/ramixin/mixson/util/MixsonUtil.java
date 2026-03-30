@@ -14,7 +14,7 @@ public interface MixsonUtil {
 
     static String identifierToPathString(String resourceId, String extension) {
         Identifier usable = Identifier.parse(resourceId);
-        return usable.getNamespace() + '~' + usable.getPath().replaceFirst(String.format("\\%s", extension), "").replaceAll("/", "-");
+        return usable.getNamespace() + '~' + usable.getPath().replaceFirst(String.format("\\%s", extension), "").replace("/", "-");
     }
 
     static String stringToUsablePath(String string) {
@@ -25,15 +25,6 @@ public interface MixsonUtil {
         String stringId = id.getPath();
         for(int i = stringId.length()-1; i > 0; i--) if(stringId.charAt(i) == '.') return Identifier.fromNamespaceAndPath(id.getNamespace(), stringId.substring(0, i));
         return id;
-    }
-
-    static <T> void addComponent(T component, int priority, UUID uuid, Map<UUID, T> components, SortedMap<Integer, List<T>> orderedComponents) {
-        components.put(uuid, component);
-        List<T> componentSet;
-        if(orderedComponents.get(priority) == null) componentSet = new ArrayList<>();
-        else componentSet = orderedComponents.get(priority);
-        componentSet.add(component);
-        orderedComponents.put(priority, componentSet);
     }
 
     static <T> Optional<T> deserializeFile(MixsonCodec<T> codec, Resource resource, Consumer<Exception> errorCallback) {

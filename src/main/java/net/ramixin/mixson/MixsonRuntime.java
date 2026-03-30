@@ -18,15 +18,17 @@ public class MixsonRuntime<T> {
     private final BiConsumer<String, Exception> errorCallback;
     private final List<AbstractEntry> queuedEvents = new ArrayList<>();
 
-    protected MixsonRuntime(AbstractHook<T> hook, SortedMap<Integer, List<MixsonEvent<?>>> events, SortedMap<Integer, List<ResourceReference<?>>> references, BiConsumer<String, Exception> logCallback) {
+    protected MixsonRuntime(AbstractHook<T> hook, MixsonRegistry<MixsonEvent<?>> eventRegistry, MixsonRegistry<ResourceReference<?>> referenceRegistry, BiConsumer<String, Exception> logCallback) {
         this.hook = hook;
         this.errorCallback = logCallback;
         TreeMap<Integer, List<AbstractEntry>> combinedEntries = new TreeMap<>();
+        SortedMap<Integer, List<ResourceReference<?>>> references = referenceRegistry.captureSnapshot();
         for(int priority : references.keySet()) {
             List<ResourceReference<?>> builtReference = references.get(priority);
             List<AbstractEntry> entries = combinedEntries.computeIfAbsent(priority, _ -> new ArrayList<>());
             builtReference.stream().map((reference) -> new ReferenceEntry<>(priority, reference)).forEach(entries::add);
         }
+        SortedMap<Integer, List<MixsonEvent<?>>> events = eventRegistry.captureSnapshot();
         for(int priority : events.keySet()) {
             List<MixsonEvent<?>> builtEvents = events.get(priority);
             List<AbstractEntry> entries = combinedEntries.computeIfAbsent(priority, _ -> new ArrayList<>());
